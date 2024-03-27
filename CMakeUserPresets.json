@@ -1,0 +1,10 @@
+{
+    "version": 4,
+    "vendor": {
+        "conan": {}
+    },
+    "include": [
+        "W:\\C++\\bomb_engine\\build\\generators\\CMakePresets.json",
+        "w:\\C++\\bomb_engine\\build\\generators\\CMakePresets.json"
+    ]
+}
