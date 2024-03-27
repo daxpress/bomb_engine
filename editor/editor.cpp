@@ -7,6 +7,7 @@
 int main()
 {
 	core::graphics::Window window{1920, 1080, "Bomb Engine Editor"};
+	auto renderer = core::graphics::Render{ window, true };
 
 	while(window.is_open()) 
 	{

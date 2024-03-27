@@ -22,7 +22,10 @@ namespace core::graphics
 		inline bool is_open();
 		inline void poll_events();
 
+		inline const std::string& get_title() const { return m_title; }
+
 	private:
+
 		GLFWwindow* m_raw_window = nullptr;
 		uint32_t m_width;
 		uint32_t m_height;
