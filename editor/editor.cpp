@@ -2,12 +2,16 @@
 //
 
 #include "core/graphics/window.h"
+#include "core/graphics/renderer.h"
 
 int main()
 {
 	core::graphics::Window window{1920, 1080, "Bomb Engine Editor"};
 
-	while(true){}
+	while(window.is_open()) 
+	{
+		window.poll_events();
+	}
 
 	return 0;
 }

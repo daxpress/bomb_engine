@@ -1,5 +1,7 @@
 #include "window.h"
 
+#include <GLFW/glfw3.h>
+
 namespace core::graphics
 {
 	GLFWwindow* init_window(const uint32_t width, const uint32_t height, const std::string& title)
@@ -22,7 +24,7 @@ namespace core::graphics
 		:m_width(width), m_height(height), m_title(title)
 	{
 		glfwInit();
-		init_window(width, height, title);
+		m_raw_window = init_window(width, height, title);
 	}
 
 	Window::~Window()
@@ -30,4 +32,12 @@ namespace core::graphics
 		glfwDestroyWindow(m_raw_window);
 	}
 
+	inline bool Window::is_open()
+	{
+		return !glfwWindowShouldClose(m_raw_window);
+	}
+	inline void Window::poll_events()
+	{
+		glfwPollEvents();
+	}
 }

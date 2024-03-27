@@ -14,4 +14,4 @@ find_package(glfw3 CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(Vulkan REQUIRED)
 
-target_link_libraries(bomb_engine_core glfw glm::glm)
+target_link_libraries(bomb_engine_core glfw glm::glm Vulkan::Vulkan)

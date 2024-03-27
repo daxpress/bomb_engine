@@ -5,8 +5,7 @@
 #include <cstdint>
 #include <string>
 
-#include <GLFW/glfw3.h>
-#include <glm/glm.hpp>
+class GLFWwindow;
 
 namespace core::graphics
 {
@@ -19,6 +18,9 @@ namespace core::graphics
 		Window();
 		Window(const uint32_t width, const uint32_t height, const std::string& title);
 		~Window();
+
+		inline bool is_open();
+		inline void poll_events();
 
 	private:
 		GLFWwindow* m_raw_window = nullptr;
