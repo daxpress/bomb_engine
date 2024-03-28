@@ -124,6 +124,12 @@ namespace core::graphics
 	Render::Render(const Window& window, bool enable_validation_layers)
 	{
 		create_instance(window, enable_validation_layers);
+		create_surface(window, m_surface);
+	}
+
+	Render::~Render()
+	{
+		vkDestroySurfaceKHR(*m_vulkan_instance, m_surface, nullptr);
 	}
 
 	void Render::create_instance(const Window& window, bool enable_validation_layers)
@@ -189,9 +195,12 @@ namespace core::graphics
 		auto messenger = instance->createDebugUtilsMessengerEXTUnique(messenger_info, nullptr, dldi);
 	}
 
-	void Render::create_surface()
+	void Render::create_surface(const Window& window, VkSurfaceKHR& surface)
 	{
-
+		if (glfwCreateWindowSurface(*m_vulkan_instance, window.get_raw_window(), nullptr, &surface) != VK_SUCCESS)
+		{
+			throw::std::runtime_error("failed to create window surface!");
+		}
 	}
 
 }

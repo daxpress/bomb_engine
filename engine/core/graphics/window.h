@@ -23,6 +23,7 @@ namespace core::graphics
 		inline void poll_events();
 
 		inline const std::string& get_title() const { return m_title; }
+		inline GLFWwindow* get_raw_window() const { return m_raw_window; }
 
 	private:
 
