@@ -11,7 +11,7 @@ namespace core::graphics
 	{
 	public:
 		Render(const Window& window, bool enable_validation_layers);
-		~Render();
+		~Render() = default;
 
 	private:
 		const std::vector<const char*> m_validation_layers{
@@ -23,5 +23,10 @@ namespace core::graphics
 	private:
 
 		void create_instance(const Window& window, bool enable_validation_layers);
+		/// <summary>
+		/// Use this to setup a debug callback
+		/// </summary>
+		void setup_debug_messenger(vk::UniqueInstance& instance, vk::DebugUtilsMessengerCreateInfoEXT& messenger_info);
+		void create_surface();
 	};
 }

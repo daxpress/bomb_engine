@@ -91,6 +91,7 @@ std::vector<const char*> get_required_instance_extensions(bool enable_validation
 	return extensions;
 }
 
+// The debug callback for the validation layers: it has to be either a function or a static method (no context)
 VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
 	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 	VkDebugUtilsMessageTypeFlagsEXT messageType,
@@ -101,6 +102,21 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
 	return VK_FALSE;
 }
 
+void fill_debug_utils_messenger_create_info(vk::DebugUtilsMessengerCreateInfoEXT& messenger_info)
+{
+
+	messenger_info.sType = vk::StructureType::eDebugUtilsMessengerCreateInfoEXT;
+	messenger_info.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
+		vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
+		vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
+	messenger_info.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
+		vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance |
+		vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral;
+	messenger_info.pfnUserCallback = &debug_callback;
+	// at the moment we keep it to null ,when we have a bit of framework we might pass in something
+	messenger_info.pUserData = nullptr;
+}
+
 #pragma endregion vulkan instance helpers
 
 namespace core::graphics
@@ -108,9 +124,6 @@ namespace core::graphics
 	Render::Render(const Window& window, bool enable_validation_layers)
 	{
 		create_instance(window, enable_validation_layers);
-	}
-	Render::~Render()
-	{
 	}
 
 	void Render::create_instance(const Window& window, bool enable_validation_layers)
@@ -129,15 +142,17 @@ namespace core::graphics
 		createinfo.pApplicationInfo = &appInfo;
 		createinfo.pNext = nullptr;
 
+		// get the glfw extensions required for Vulkan
 		uint32_t glfw_extension_count = 0;
 		const char** glfw_extensions;
 		glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
 
 		if (!extensions_supported(glfw_extensions, glfw_extension_count))
 		{
-			throw std::runtime_error("required extensions are not supported!");
+			throw std::runtime_error("required glfw extensions are not supported!");
 		}
 
+		// get the final list of all the extensions (conditionally adds in the validation layers)
 		auto extensions = get_required_instance_extensions(enable_validation_layers);
 		createinfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
 		createinfo.ppEnabledExtensionNames = extensions.data();
@@ -147,24 +162,13 @@ namespace core::graphics
 			throw std::runtime_error("requested validation layers are not supported!");
 		}
 
-		vk::DebugUtilsMessengerCreateInfoEXT messenger{};
+		vk::DebugUtilsMessengerCreateInfoEXT messenger_info{};
 		if (enable_validation_layers)
 		{
 			createinfo.enabledLayerCount = static_cast<uint32_t>(m_validation_layers.size());
 			createinfo.ppEnabledLayerNames = m_validation_layers.data();
-
-			messenger.sType = vk::StructureType::eDebugUtilsMessengerCreateInfoEXT;
-			messenger.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
-				vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
-				vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
-			messenger.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
-				vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance |
-				vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral;
-			messenger.pfnUserCallback = &debug_callback;
-			// at the moment we keep it to null ,when we have a bit of framework we might pass in something
-			messenger.pUserData = nullptr;
-
-			createinfo.pNext = &messenger;
+			fill_debug_utils_messenger_create_info(messenger_info);
+			createinfo.pNext = &messenger_info;
 		}
 		else
 		{
@@ -173,5 +177,21 @@ namespace core::graphics
 		}
 
 		m_vulkan_instance = vk::createInstanceUnique(createinfo);
+
+		setup_debug_messenger(m_vulkan_instance, messenger_info);
 	}
+
+	void Render::setup_debug_messenger(vk::UniqueInstance& instance, vk::DebugUtilsMessengerCreateInfoEXT& messenger_info)
+	{
+		// Vulkan hpp gives us a DispatchLoaderDynamic that basically loads the requiired method for us
+		vk::DispatchLoaderDynamic dldi;
+		dldi.init(*instance, vkGetInstanceProcAddr);
+		auto messenger = instance->createDebugUtilsMessengerEXTUnique(messenger_info, nullptr, dldi);
+	}
+
+	void Render::create_surface()
+	{
+
+	}
+
 }
