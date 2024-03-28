@@ -2,8 +2,7 @@
 
 #include "core/bomb_engine.h"
 #include "core/graphics/window.h"
-
-#include <vulkan/vulkan.hpp>
+#include "core/graphics/api_bridge.h"
 
 namespace core::graphics
 {
@@ -14,21 +13,6 @@ namespace core::graphics
 		~Render();
 
 	private:
-		const std::vector<const char*> m_validation_layers{
-			"VK_LAYER_KHRONOS_validation"
-		};
-
-		vk::UniqueInstance m_vulkan_instance;
-		VkSurfaceKHR m_surface;
-
-	private:
-
-		void create_instance(const Window& window, bool enable_validation_layers);
-		/// <summary>
-		/// Use this to setup a debug callback
-		/// </summary>
-		void setup_debug_messenger(vk::UniqueInstance& instance, vk::DebugUtilsMessengerCreateInfoEXT& messenger_info);
-
-		void create_surface(const Window& window, VkSurfaceKHR& surface);
+		std::unique_ptr<APIBridge> m_api_bridge;
 	};
 }
