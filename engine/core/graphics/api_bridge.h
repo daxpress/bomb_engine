@@ -19,7 +19,7 @@ namespace core::graphics
 		APIBridge() = default;
 
 		[[nodiscard]]
-		bool initialize(const Window& window, bool enable_validation_layers, E_API desired_api);
+		bool initialize(Window& window, bool enable_validation_layers, E_API desired_api);
 
 		~APIBridge();
 

@@ -12,7 +12,7 @@ namespace core::graphics::api
 	class APIVulkan : public IAPI
 	{
 	public:
-		APIVulkan(const Window& window, bool enable_validation_layers);
+		APIVulkan(Window& window, bool enable_validation_layers);
 		virtual ~APIVulkan() override;
 
 		inline virtual E_API get_api() { return E_API::API_VULKAN; }
@@ -28,7 +28,7 @@ namespace core::graphics::api
 		};
 
 		bool b_use_validation_layers = false;
-
+		Window& m_window_ref;
 		vk::UniqueInstance m_vulkan_instance;
 		VkSurfaceKHR m_surface;
 		vk::PhysicalDevice m_physical_device;

@@ -122,8 +122,9 @@ void fill_debug_utils_messenger_create_info(vk::DebugUtilsMessengerCreateInfoEXT
 
 namespace core::graphics::api
 {
-	APIVulkan::APIVulkan(const Window& window, bool enable_validation_layers)
-		:b_use_validation_layers(enable_validation_layers)
+	APIVulkan::APIVulkan(Window& window, bool enable_validation_layers)
+		:b_use_validation_layers(enable_validation_layers),
+		m_window_ref(window)
 	{
 		create_instance(window, enable_validation_layers);
 		create_surface(window, m_surface);
@@ -138,7 +139,10 @@ namespace core::graphics::api
 
 	APIVulkan::~APIVulkan()
 	{
-		m_device.destroy();
+		if (m_device)
+		{
+			m_device.destroy();
+		}
 		vkDestroySurfaceKHR(*m_vulkan_instance, m_surface, nullptr);
 	}
 

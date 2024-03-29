@@ -4,7 +4,7 @@
 
 namespace core::graphics
 {
-	Render::Render(const Window& window, bool enable_validation_layers)
+	Render::Render(Window& window, bool enable_validation_layers)
 	{
 		m_api_bridge = std::make_unique<APIBridge>();
 		bool result = m_api_bridge->initialize(window, enable_validation_layers, E_API::API_VULKAN);

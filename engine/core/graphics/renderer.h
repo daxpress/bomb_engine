@@ -9,7 +9,7 @@ namespace core::graphics
 	class BOMB_ENGINE_API Render
 	{
 	public:
-		Render(const Window& window, bool enable_validation_layers);
+		Render(Window& window, bool enable_validation_layers);
 		~Render();
 
 	private:

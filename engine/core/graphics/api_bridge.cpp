@@ -4,7 +4,7 @@
 
 namespace core::graphics
 {
-	bool APIBridge::initialize(const Window& window, bool enable_validation_layers, E_API desired_api)
+	bool APIBridge::initialize(Window& window, bool enable_validation_layers, E_API desired_api)
 	{
 		switch (desired_api)
 		{
