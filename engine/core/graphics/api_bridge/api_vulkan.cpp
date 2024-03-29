@@ -2,6 +2,11 @@
 
 #include <GLFW/glfw3.h>
 #include <iostream>
+#include <map>
+#include <set>
+#include <algorithm>
+
+// TODO: Replace exceptions with logs (can also throw exceptions but they must be engine-breaking!)
 
 #pragma region vulkan instance helpers
 
@@ -120,12 +125,14 @@ namespace core::graphics::api
 	{
 		create_instance(window, enable_validation_layers);
 		create_surface(window, m_surface);
+		select_physical_device();
 	}
 
 	APIVulkan::~APIVulkan()
 	{
 		vkDestroySurfaceKHR(*m_vulkan_instance, m_surface, nullptr);
 	}
+
 	void APIVulkan::create_instance(const Window& window, bool enable_validation_layers)
 	{
 		vk::ApplicationInfo appInfo(
@@ -137,6 +144,7 @@ namespace core::graphics::api
 			nullptr
 		);
 
+		// not using constructor here to allow flexibility for the validation layers
 		vk::InstanceCreateInfo createinfo{};
 		createinfo.sType = vk::StructureType::eInstanceCreateInfo;
 		createinfo.pApplicationInfo = &appInfo;
@@ -184,7 +192,7 @@ namespace core::graphics::api
 	void APIVulkan::setup_debug_messenger(vk::UniqueInstance& instance, vk::DebugUtilsMessengerCreateInfoEXT& messenger_info)
 	{
 		// Vulkan hpp gives us a DispatchLoaderDynamic that basically loads the requiired method for us
-		vk::DispatchLoaderDynamic dldi;
+		static vk::DispatchLoaderDynamic dldi;
 		dldi.init(*instance, vkGetInstanceProcAddr);
 		auto messenger = instance->createDebugUtilsMessengerEXTUnique(messenger_info, nullptr, dldi);
 	}
@@ -195,5 +203,137 @@ namespace core::graphics::api
 		{
 			throw::std::runtime_error("failed to create window surface!");
 		}
+	}
+
+	void APIVulkan::select_physical_device()
+	{
+		auto physical_devices = m_vulkan_instance->enumeratePhysicalDevices();
+		if (physical_devices.empty())
+		{
+			throw std::runtime_error("failed to find a supported GPU!");
+		}
+
+		std::map<uint32_t, vk::PhysicalDevice, std::greater<uint32_t>> device_ratings;
+
+		for (const auto& p_device : physical_devices)
+		{
+			if (physical_device_is_suitable(p_device))
+			{
+				auto rating = rate_physical_device(p_device);
+				device_ratings.emplace(rating, p_device);
+			}
+		}
+
+		if (physical_devices.empty())
+		{
+			throw std::runtime_error("failed to find a supported GPU!");
+		}
+
+		m_phsycal_device = device_ratings.begin()->second;
+		// TODO: use logging macro instead
+		std::cout << "Picked Device: " << m_phsycal_device.getProperties().deviceName << std::endl;
+	}
+
+	bool APIVulkan::physical_device_is_suitable(vk::PhysicalDevice physical_device)
+	{
+		auto families = get_queue_families(physical_device);
+		if (!families.is_complete())
+		{
+			return false;
+		}
+
+		if (!check_extensions_support(physical_device))
+		{
+			return false;
+		}
+
+		auto swapchain_details = SwapchainDetails(physical_device, m_surface);
+		if (swapchain_details.formats.empty() || swapchain_details.present_modes.empty())
+		{
+			return false;
+		}
+
+		return true;
+	}
+
+	uint32_t APIVulkan::rate_physical_device(vk::PhysicalDevice physical_device)
+	{
+		uint32_t score = 0;
+
+		auto properties = physical_device.getProperties();
+		auto memory_properties = physical_device.getMemoryProperties();
+		auto features = physical_device.getFeatures();
+
+		if (properties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
+		{
+			score += 1000;
+		}
+
+		score += properties.limits.maxComputeSharedMemorySize;
+		score += properties.limits.maxImageDimension2D + properties.limits.maxImageDimension3D;
+		
+		for (const auto& heap : memory_properties.memoryHeaps)
+		{
+			if (heap.flags == vk::MemoryHeapFlagBits::eDeviceLocal)
+			{
+				// heap size is in bytes, we want it in the order of Mb to keep it somewhat proportionate
+				score += static_cast<uint32_t>(std::round(heap.size * 1e-6f));
+			}
+		}
+
+		return score;
+	}
+
+	QueueFamilyIndices APIVulkan::get_queue_families(vk::PhysicalDevice physical_device)
+	{
+		QueueFamilyIndices families{};
+
+		auto queue_families = physical_device.getQueueFamilyProperties();
+
+		for (uint32_t family_index = 0; auto & queue_family : queue_families)
+		{
+			if (queue_family.queueFlags & vk::QueueFlagBits::eGraphics)
+			{
+				families.graphics = family_index;
+			}
+
+			if (physical_device.getSurfaceSupportKHR(family_index, m_surface))
+			{
+				families.present = family_index;
+			}
+
+			if (!(queue_family.queueFlags & vk::QueueFlagBits::eGraphics) &&
+				(queue_family.queueFlags & vk::QueueFlagBits::eTransfer)/* == vk::QueueFlagBits::eTransfer*/)
+			{
+				families.transfer = family_index;
+			}
+
+			if (!(queue_family.queueFlags & vk::QueueFlagBits::eGraphics) &&
+				queue_family.queueFlags & vk::QueueFlagBits::eCompute)
+			{
+				families.compute = family_index;
+			}
+
+			if (families.is_complete())
+			{
+				break;
+			}
+		}
+
+		return families;
+	}
+
+	bool APIVulkan::check_extensions_support(vk::PhysicalDevice physical_device)
+	{
+		auto available_extensions = physical_device.enumerateDeviceExtensionProperties();
+
+		std::set<std::string> required_extensions{ m_required_device_extensions.begin(), m_required_device_extensions.end() };
+
+		for (const auto& extension : available_extensions)
+		{
+			required_extensions.erase(extension.extensionName);
+		}
+
+		return required_extensions.empty();
 	}
 }

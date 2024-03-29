@@ -2,9 +2,10 @@
 
 #include "core/graphics/api_bridge/api_interface.h"
 #include "core/graphics/window.h"
+#include "core/graphics/api_bridge/api_vulkan_structs.h"
 
-#include <vector>
 #include <vulkan/vulkan.hpp>
+#include <vector>
 
 namespace core::graphics::api
 {
@@ -22,8 +23,13 @@ namespace core::graphics::api
 			"VK_LAYER_KHRONOS_validation"
 		};
 
+		const std::vector<std::string> m_required_device_extensions{
+			VK_KHR_SWAPCHAIN_EXTENSION_NAME
+		};
+
 		vk::UniqueInstance m_vulkan_instance;
 		VkSurfaceKHR m_surface;
+		vk::PhysicalDevice m_phsycal_device;
 
 	private:
 
@@ -34,5 +40,11 @@ namespace core::graphics::api
 		void setup_debug_messenger(vk::UniqueInstance& instance, vk::DebugUtilsMessengerCreateInfoEXT& messenger_info);
 
 		void create_surface(const Window& window, VkSurfaceKHR& surface);
+
+		void select_physical_device();
+		bool physical_device_is_suitable(vk::PhysicalDevice physical_device);
+		uint32_t rate_physical_device(vk::PhysicalDevice physical_device);
+		QueueFamilyIndices get_queue_families(vk::PhysicalDevice physical_device);
+		bool check_extensions_support(vk::PhysicalDevice physical_device);
 	};
 }
