@@ -23,13 +23,20 @@ namespace core::graphics::api
 			"VK_LAYER_KHRONOS_validation"
 		};
 
-		const std::vector<std::string> m_required_device_extensions{
+		const std::vector<const char*> m_required_device_extensions{
 			VK_KHR_SWAPCHAIN_EXTENSION_NAME
 		};
 
+		bool b_use_validation_layers = false;
+
 		vk::UniqueInstance m_vulkan_instance;
 		VkSurfaceKHR m_surface;
-		vk::PhysicalDevice m_phsycal_device;
+		vk::PhysicalDevice m_physical_device;
+		vk::Device m_device;
+		vk::Queue m_graphics_queue;
+		vk::Queue m_present_queue;
+		vk::Queue m_transfer_queue;
+		vk::Queue m_compute_queue;
 
 	private:
 
@@ -41,10 +48,17 @@ namespace core::graphics::api
 
 		void create_surface(const Window& window, VkSurfaceKHR& surface);
 
-		void select_physical_device();
-		bool physical_device_is_suitable(vk::PhysicalDevice physical_device);
+		vk::PhysicalDevice select_physical_device();
+		/// <summary>
+		/// Rates a physical device to pick the best one from the available ones.
+		/// </summary>
+		/// <param name="physical_device:"> the physical device to rate</param>
+		/// <returns> the overall score based on the features and properties</returns>
 		uint32_t rate_physical_device(vk::PhysicalDevice physical_device);
+		bool physical_device_is_suitable(vk::PhysicalDevice physical_device);
 		QueueFamilyIndices get_queue_families(vk::PhysicalDevice physical_device);
 		bool check_extensions_support(vk::PhysicalDevice physical_device);
+
+		vk::Device create_logical_device(vk::PhysicalDevice physical_device);
 	};
 }

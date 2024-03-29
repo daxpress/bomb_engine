@@ -5,6 +5,7 @@
 #include <map>
 #include <set>
 #include <algorithm>
+#include <array>
 
 // TODO: Replace exceptions with logs (can also throw exceptions but they must be engine-breaking!)
 
@@ -122,14 +123,22 @@ void fill_debug_utils_messenger_create_info(vk::DebugUtilsMessengerCreateInfoEXT
 namespace core::graphics::api
 {
 	APIVulkan::APIVulkan(const Window& window, bool enable_validation_layers)
+		:b_use_validation_layers(enable_validation_layers)
 	{
 		create_instance(window, enable_validation_layers);
 		create_surface(window, m_surface);
-		select_physical_device();
+		m_physical_device = select_physical_device();
+		m_device = create_logical_device(m_physical_device);
+		auto families = get_queue_families(m_physical_device);
+		m_graphics_queue = m_device.getQueue(families.graphics.value(), 0);
+		m_present_queue = m_device.getQueue(families.present.value(), 0);
+		m_transfer_queue = m_device.getQueue(families.transfer.value(), 0);
+		m_compute_queue = m_device.getQueue(families.compute.value(), 0);
 	}
 
 	APIVulkan::~APIVulkan()
 	{
+		m_device.destroy();
 		vkDestroySurfaceKHR(*m_vulkan_instance, m_surface, nullptr);
 	}
 
@@ -205,7 +214,7 @@ namespace core::graphics::api
 		}
 	}
 
-	void APIVulkan::select_physical_device()
+	vk::PhysicalDevice APIVulkan::select_physical_device()
 	{
 		auto physical_devices = m_vulkan_instance->enumeratePhysicalDevices();
 		if (physical_devices.empty())
@@ -229,9 +238,10 @@ namespace core::graphics::api
 			throw std::runtime_error("failed to find a supported GPU!");
 		}
 
-		m_phsycal_device = device_ratings.begin()->second;
 		// TODO: use logging macro instead
-		std::cout << "Picked Device: " << m_phsycal_device.getProperties().deviceName << std::endl;
+		std::cout << "Picked Device: " << device_ratings.begin()->second.getProperties().deviceName << std::endl;
+
+		return device_ratings.begin()->second;
 	}
 
 	bool APIVulkan::physical_device_is_suitable(vk::PhysicalDevice physical_device)
@@ -271,7 +281,7 @@ namespace core::graphics::api
 
 		score += properties.limits.maxComputeSharedMemorySize;
 		score += properties.limits.maxImageDimension2D + properties.limits.maxImageDimension3D;
-		
+
 		for (const auto& heap : memory_properties.memoryHeaps)
 		{
 			if (heap.flags == vk::MemoryHeapFlagBits::eDeviceLocal)
@@ -335,5 +345,48 @@ namespace core::graphics::api
 		}
 
 		return required_extensions.empty();
+	}
+
+	vk::Device APIVulkan::create_logical_device(vk::PhysicalDevice physical_device)
+	{
+		auto families = get_queue_families(physical_device);
+
+		std::set<uint32_t> unique_families = {
+			families.graphics.value(),
+			families.present.value(),
+			families.transfer.value(),
+			families.compute.value(),
+		};
+
+		// atm same priority for every queue, when we have a more complex rendering solution I might change it
+		std::array<float, 4> priorities{ 1.0f };
+
+		std::vector<vk::DeviceQueueCreateInfo> queue_create_infos{};
+
+		for (const auto& queue_family : unique_families)
+		{
+			vk::DeviceQueueCreateInfo queue_create_info(vk::DeviceQueueCreateFlags(), queue_family, priorities);
+			queue_create_infos.push_back(queue_create_info);
+		}
+
+		// TODO: have a better features selection
+		vk::PhysicalDeviceFeatures device_features{};
+		device_features.samplerAnisotropy = vk::True;
+		device_features.sampleRateShading = vk::True;
+
+		vk::DeviceCreateInfo create_info(
+			vk::DeviceCreateFlags(),
+			queue_create_infos,
+			nullptr,
+			m_required_device_extensions,
+			&device_features);
+
+		if (b_use_validation_layers)
+		{
+			create_info.enabledLayerCount = static_cast<uint32_t>(m_validation_layers.size());
+			create_info.ppEnabledLayerNames = m_validation_layers.data();
+		}
+
+		return physical_device.createDevice(create_info);
 	}
 }
