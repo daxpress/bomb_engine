@@ -30,4 +30,13 @@ namespace core::graphics::api
 
 		SwapchainDetails(vk::PhysicalDevice physical_device, vk::SurfaceKHR surface);
 	};
+
+	struct SwapchainInfo
+	{
+		vk::SwapchainKHR swapchain;
+		std::vector<vk::Image> images;
+		std::vector<vk::ImageView> image_views;
+		vk::Format format;
+		vk::Extent2D extent;
+	};
 }

@@ -1,6 +1,8 @@
 #include "core/graphics/api_bridge/api_vulkan.h"
 
+#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+
 #include <iostream>
 #include <map>
 #include <set>
@@ -135,10 +137,19 @@ namespace core::graphics::api
 		m_present_queue = m_device.getQueue(families.present.value(), 0);
 		m_transfer_queue = m_device.getQueue(families.transfer.value(), 0);
 		m_compute_queue = m_device.getQueue(families.compute.value(), 0);
+		m_swapchain_info = create_swapchain(m_physical_device, m_surface, m_device);
 	}
 
 	APIVulkan::~APIVulkan()
 	{
+		for (const auto& image_view : m_swapchain_info.image_views)
+		{
+			m_device.destroyImageView(image_view);
+		}
+		if (m_swapchain_info.swapchain)
+		{
+			m_device.destroySwapchainKHR(m_swapchain_info.swapchain);
+		}
 		if (m_device)
 		{
 			m_device.destroy();
@@ -288,7 +299,7 @@ namespace core::graphics::api
 
 		for (const auto& heap : memory_properties.memoryHeaps)
 		{
-			if (heap.flags == vk::MemoryHeapFlagBits::eDeviceLocal)
+			if (heap.flags & vk::MemoryHeapFlagBits::eDeviceLocal)
 			{
 				// heap size is in bytes, we want it in the order of Mb to keep it somewhat proportionate
 				score += static_cast<uint32_t>(std::round(heap.size * 1e-6f));
@@ -392,5 +403,112 @@ namespace core::graphics::api
 		}
 
 		return physical_device.createDevice(create_info);
+	}
+
+	SwapchainInfo APIVulkan::create_swapchain(vk::PhysicalDevice physical_device, vk::SurfaceKHR surface, vk::Device device, vk::SwapchainKHR old_swapchain)
+	{
+		auto swapchain_details = SwapchainDetails(physical_device, surface);
+		auto [format, color_space] = choose_swapchain_surface_format(swapchain_details.formats);
+		auto present_mode = choose_swapchain_present_mode(swapchain_details.present_modes);
+		auto extent = choose_swapchain_extent(swapchain_details.capabilities);
+
+		uint32_t image_count = swapchain_details.capabilities.minImageCount + 1;
+		if (swapchain_details.capabilities.maxImageCount > 0 &&
+			image_count > swapchain_details.capabilities.maxImageCount)
+		{
+			image_count = swapchain_details.capabilities.maxImageCount;
+		}
+
+		auto indices = get_queue_families(physical_device);
+		std::vector<uint32_t> swapchain_sharing_indicies{};
+		uint32_t sharing_index_count = 0;
+		auto sharing_mode = vk::SharingMode::eExclusive;
+		if (indices.graphics != indices.present)
+		{
+			sharing_index_count = 2;
+			swapchain_sharing_indicies = { indices.graphics.value(), indices.present.value() };
+			sharing_mode = vk::SharingMode::eConcurrent;
+		}
+
+		vk::SwapchainCreateInfoKHR create_info(vk::SwapchainCreateFlagsKHR(),
+			surface,
+			image_count,
+			format,
+			color_space,
+			extent,
+			1,
+			vk::ImageUsageFlagBits::eColorAttachment,
+			sharing_mode,
+			sharing_index_count,
+			swapchain_sharing_indicies.data(),
+			swapchain_details.capabilities.currentTransform,
+			vk::CompositeAlphaFlagBitsKHR::eOpaque,
+			present_mode,
+			true,
+			old_swapchain,
+			nullptr);
+
+		SwapchainInfo swapchain_info{};
+		swapchain_info.swapchain = device.createSwapchainKHR(create_info);
+		swapchain_info.extent = extent;
+		swapchain_info.format = format;
+		swapchain_info.images = device.getSwapchainImagesKHR(swapchain_info.swapchain);
+
+		swapchain_info.image_views.reserve(swapchain_info.images.size());
+		vk::ImageViewCreateInfo image_view_create_info(
+			vk::ImageViewCreateFlags(),
+			{},
+			vk::ImageViewType::e2D,
+			format,
+			{},
+			vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
+
+		for (const auto& image : swapchain_info.images)
+		{
+			image_view_create_info.image = image;
+			swapchain_info.image_views.push_back(device.createImageView(image_view_create_info));
+		}
+
+		return  swapchain_info;
+	}
+
+	vk::SurfaceFormatKHR APIVulkan::choose_swapchain_surface_format(std::vector<vk::SurfaceFormatKHR> formats)
+	{
+		for (const auto& format : formats)
+		{
+			if (format.format == vk::Format::eB8G8R8A8Srgb && format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear)
+			{
+				return format;
+			}
+		}
+		return formats[0];
+	}
+
+	vk::PresentModeKHR APIVulkan::choose_swapchain_present_mode(std::vector<vk::PresentModeKHR> present_modes)
+	{
+		for (const auto& present_mode : present_modes)
+		{
+			if (present_mode == vk::PresentModeKHR::eMailbox) // to render frames as fast as possible
+			{
+				return present_mode;
+			}
+		}
+		// guaranteed by spec
+		return vk::PresentModeKHR::eFifo;
+	}
+
+	vk::Extent2D APIVulkan::choose_swapchain_extent(vk::SurfaceCapabilitiesKHR capabilities)
+	{
+		if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
+		{
+			return capabilities.currentExtent;
+		}
+
+		int width, height;
+		glfwGetFramebufferSize(m_window_ref.get_raw_window(), &width, &height);
+
+		vk::Extent2D extent(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+
+		return std::clamp(extent, capabilities.minImageExtent, capabilities.maxImageExtent);
 	}
 }

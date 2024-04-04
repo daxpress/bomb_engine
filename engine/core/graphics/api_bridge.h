@@ -2,7 +2,6 @@
 
 #include "core/bomb_engine.h"
 #include "core/graphics/window.h"
-#include "core/graphics/apis.h"
 
 #include <memory>
 
@@ -12,6 +11,12 @@ namespace core::graphics
 	{
 		class IAPI;
 	}
+
+	enum class E_API : uint8_t
+	{
+		API_VULKAN = 0,
+		API_DIRECTX = 1,
+	};
 
 	class BOMB_ENGINE_API APIBridge
 	{
