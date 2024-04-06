@@ -37,7 +37,7 @@ namespace core::graphics::api
 		vk::Queue m_present_queue;
 		vk::Queue m_transfer_queue;
 		vk::Queue m_compute_queue;
-		SwapchainInfo m_swapchain_info;
+		VkSwapchainInfo m_swapchain_info;
 
 	private:
 
@@ -57,12 +57,12 @@ namespace core::graphics::api
 		/// <returns> the overall score based on the features and properties</returns>
 		uint32_t rate_physical_device(vk::PhysicalDevice physical_device);
 		bool physical_device_is_suitable(vk::PhysicalDevice physical_device);
-		QueueFamilyIndices get_queue_families(vk::PhysicalDevice physical_device);
+		VkQueueFamilyIndices get_queue_families(vk::PhysicalDevice physical_device);
 		bool check_extensions_support(vk::PhysicalDevice physical_device);
 
 		vk::Device create_logical_device(vk::PhysicalDevice physical_device);
 
-		SwapchainInfo create_swapchain(vk::PhysicalDevice physical_device, vk::SurfaceKHR surface, vk::Device device, vk::SwapchainKHR old_swapchain = nullptr);
+		VkSwapchainInfo create_swapchain(vk::PhysicalDevice physical_device, vk::SurfaceKHR surface, vk::Device device, vk::SwapchainKHR old_swapchain = nullptr);
 		vk::SurfaceFormatKHR choose_swapchain_surface_format(std::vector<vk::SurfaceFormatKHR> formats);
 		vk::PresentModeKHR choose_swapchain_present_mode(std::vector<vk::PresentModeKHR> present_modes);
 		vk::Extent2D choose_swapchain_extent(vk::SurfaceCapabilitiesKHR capabilities);

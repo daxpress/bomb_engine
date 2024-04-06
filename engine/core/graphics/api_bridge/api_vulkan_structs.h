@@ -7,7 +7,7 @@
 
 namespace core::graphics::api
 {
-	struct QueueFamilyIndices
+	struct VkQueueFamilyIndices
 	{
 		std::optional<uint32_t> graphics;
 		std::optional<uint32_t> present;
@@ -22,16 +22,16 @@ namespace core::graphics::api
 		}
 	};
 
-	struct SwapchainDetails
+	struct VkSwapchainDetails
 	{
 		vk::SurfaceCapabilitiesKHR capabilities;
 		std::vector<vk::SurfaceFormatKHR> formats;
 		std::vector<vk::PresentModeKHR> present_modes;
 
-		SwapchainDetails(vk::PhysicalDevice physical_device, vk::SurfaceKHR surface);
+		VkSwapchainDetails(vk::PhysicalDevice physical_device, vk::SurfaceKHR surface);
 	};
 
-	struct SwapchainInfo
+	struct VkSwapchainInfo
 	{
 		vk::SwapchainKHR swapchain;
 		std::vector<vk::Image> images;

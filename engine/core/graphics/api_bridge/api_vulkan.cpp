@@ -146,14 +146,8 @@ namespace core::graphics::api
 		{
 			m_device.destroyImageView(image_view);
 		}
-		if (m_swapchain_info.swapchain)
-		{
-			m_device.destroySwapchainKHR(m_swapchain_info.swapchain);
-		}
-		if (m_device)
-		{
-			m_device.destroy();
-		}
+		m_device.destroySwapchainKHR(m_swapchain_info.swapchain);
+		m_device.destroy();
 		vkDestroySurfaceKHR(*m_vulkan_instance, m_surface, nullptr);
 	}
 
@@ -272,7 +266,7 @@ namespace core::graphics::api
 			return false;
 		}
 
-		auto swapchain_details = SwapchainDetails(physical_device, m_surface);
+		auto swapchain_details = VkSwapchainDetails(physical_device, m_surface);
 		if (swapchain_details.formats.empty() || swapchain_details.present_modes.empty())
 		{
 			return false;
@@ -309,9 +303,9 @@ namespace core::graphics::api
 		return score;
 	}
 
-	QueueFamilyIndices APIVulkan::get_queue_families(vk::PhysicalDevice physical_device)
+	VkQueueFamilyIndices APIVulkan::get_queue_families(vk::PhysicalDevice physical_device)
 	{
-		QueueFamilyIndices families{};
+		VkQueueFamilyIndices families{};
 
 		auto queue_families = physical_device.getQueueFamilyProperties();
 
@@ -405,9 +399,9 @@ namespace core::graphics::api
 		return physical_device.createDevice(create_info);
 	}
 
-	SwapchainInfo APIVulkan::create_swapchain(vk::PhysicalDevice physical_device, vk::SurfaceKHR surface, vk::Device device, vk::SwapchainKHR old_swapchain)
+	VkSwapchainInfo APIVulkan::create_swapchain(vk::PhysicalDevice physical_device, vk::SurfaceKHR surface, vk::Device device, vk::SwapchainKHR old_swapchain)
 	{
-		auto swapchain_details = SwapchainDetails(physical_device, surface);
+		auto swapchain_details = VkSwapchainDetails(physical_device, surface);
 		auto [format, color_space] = choose_swapchain_surface_format(swapchain_details.formats);
 		auto present_mode = choose_swapchain_present_mode(swapchain_details.present_modes);
 		auto extent = choose_swapchain_extent(swapchain_details.capabilities);
@@ -437,7 +431,7 @@ namespace core::graphics::api
 			color_space,
 			extent,
 			1,
-			vk::ImageUsageFlagBits::eColorAttachment,
+			vk::ImageUsageFlagBits::eTransferDst,
 			sharing_mode,
 			sharing_index_count,
 			swapchain_sharing_indicies.data(),
@@ -448,7 +442,7 @@ namespace core::graphics::api
 			old_swapchain,
 			nullptr);
 
-		SwapchainInfo swapchain_info{};
+		VkSwapchainInfo swapchain_info{};
 		swapchain_info.swapchain = device.createSwapchainKHR(create_info);
 		swapchain_info.extent = extent;
 		swapchain_info.format = format;

@@ -2,7 +2,7 @@
 
 namespace core::graphics::api
 {
-	SwapchainDetails::SwapchainDetails(vk::PhysicalDevice physical_device, vk::SurfaceKHR surface)
+	VkSwapchainDetails::VkSwapchainDetails(vk::PhysicalDevice physical_device, vk::SurfaceKHR surface)
 	{
 		capabilities = physical_device.getSurfaceCapabilitiesKHR(surface);
 		formats = physical_device.getSurfaceFormatsKHR(surface);

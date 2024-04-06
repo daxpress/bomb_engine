@@ -24,6 +24,12 @@ macro(add_engine_module module_name access_specifier)
 	)
 endmacro()
 
+include(ProcessorCount)
+ProcessorCount(N)
+if(NOT N EQUAL 0)
+  set(CMAKE_BUILD_PARALLEL_LEVEL${N})
+endif()
+
 add_subdirectory(engine)
 add_subdirectory(editor)
 
