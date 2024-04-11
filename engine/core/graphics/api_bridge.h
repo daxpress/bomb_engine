@@ -26,6 +26,7 @@ namespace core::graphics
 		[[nodiscard]]
 		bool initialize(Window& window, bool enable_validation_layers, E_API desired_api);
 
+
 		~APIBridge();
 
 	private:
