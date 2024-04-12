@@ -27,6 +27,17 @@ namespace core::graphics::api
 
 		return m_device.createRenderPass(create_info);
 	}
+	void VulkanRenderPassBuilder::clear()
+	{
+		m_current_attachment = nullptr;
+		m_current_dependency = nullptr;
+		m_current_subpass = nullptr;
+
+		m_attachments.clear();
+		m_references.clear();
+		m_dependencies.clear();
+		m_subpass_infos.clear();
+	}
 	VulkanRenderPassBuilder& VulkanRenderPassBuilder::add_attachment(const uint32_t attachment_number, const vk::ImageLayout layout, const std::string name)
 	{
 		vk::AttachmentDescription attachment{};
