@@ -114,12 +114,6 @@ namespace core::graphics::api
 		return *this;
 	}
 
-	VulkanPipelineBuilder& VulkanPipelineBuilder::set_vertex_input()
-	{
-		// TODO: implementation
-		return *this;
-	}
-
 	VulkanPipelineBuilder& VulkanPipelineBuilder::set_dynamic_states(std::vector<vk::DynamicState> dynamic_states)
 	{
 		m_dynamic_state = vk::PipelineDynamicStateCreateInfo(vk::PipelineDynamicStateCreateFlagBits(), dynamic_states);

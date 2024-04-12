@@ -28,7 +28,6 @@ namespace core::graphics::api
 		VulkanPipelineBuilder& set_depth_compare_operation(vk::CompareOp operation = vk::CompareOp::eLess);
 		VulkanPipelineBuilder& set_depth_bounds(bool enable, const float min_bounds = 0.0f, const float max_bounds = 1.0f);
 		VulkanPipelineBuilder& set_stencil(bool enable, vk::StencilOpState front, vk::StencilOpState back);
-		VulkanPipelineBuilder& set_vertex_input(); // TODO: implement the shit after you figured out how to (due to bindless)
 		VulkanPipelineBuilder& set_dynamic_states(std::vector<vk::DynamicState> dynamic_states = {vk::DynamicState::eViewport, vk::DynamicState::eScissor});
 		VulkanPipelineBuilder& set_viewport_size(const float width, const float height);
 		VulkanPipelineBuilder& set_viewport_position(const float x = 0.0f, const float y = 0.0f);
