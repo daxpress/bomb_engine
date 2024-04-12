@@ -233,6 +233,17 @@ namespace core::graphics::api
 		return *this;
 	}
 
+	VulkanPipelineBuilder& VulkanPipelineBuilder::set_render_pass(vk::RenderPass render_pass)
+	{
+		m_render_pass = render_pass;
+		return *this;
+	}
+
+	VulkanPipelineBuilder& VulkanPipelineBuilder::set_render_pass(vk::RenderPass render_pass)
+	{
+		// TODO: insert return statement here
+	}
+
 	VulkanPipelineBuilder& VulkanPipelineBuilder::set_depth_attachment_format(vk::Format format)
 	{
 		m_rendering_create_info.setDepthAttachmentFormat(format);

@@ -47,6 +47,7 @@ namespace core::graphics::api
 		VulkanPipelineBuilder& set_color_write_mask(vk::ColorComponentFlags mask);
 		VulkanPipelineBuilder& set_color_attachment_format(vk::Format format);
 		VulkanPipelineBuilder& set_depth_attachment_format(vk::Format format);
+		VulkanPipelineBuilder& set_render_pass(vk::RenderPass render_pass);
 
 	private:
 		void default_vertex_input();
