@@ -115,6 +115,7 @@ namespace core::graphics::api
 		{
 			m_current_subpass->color_refs.push_back(m_references[name]);
 		}
+		return *this;
 	}
 	VulkanRenderPassBuilder& VulkanRenderPassBuilder::set_subpass_input_attachments(std::vector<std::string> names_ordered)
 	{
