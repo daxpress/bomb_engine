@@ -35,6 +35,7 @@ namespace core::graphics::api
 		VulkanRenderPassBuilder(vk::Device device);
 
 		vk::RenderPass build();
+		void clear();
 		VulkanRenderPassBuilder& add_attachment(const uint32_t attachment_number, const vk::ImageLayout layout, const std::string name);
 		VulkanRenderPassBuilder& set_attachment_format(vk::Format format);
 		VulkanRenderPassBuilder& set_attachment_samples(vk::SampleCountFlagBits samples);
