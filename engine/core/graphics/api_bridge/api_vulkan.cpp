@@ -431,7 +431,7 @@ namespace core::graphics::api
 			color_space,
 			extent,
 			1,
-			vk::ImageUsageFlagBits::eTransferDst,
+			vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eColorAttachment,
 			sharing_mode,
 			sharing_index_count,
 			swapchain_sharing_indicies.data(),
