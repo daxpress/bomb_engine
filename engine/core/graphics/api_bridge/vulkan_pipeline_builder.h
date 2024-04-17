@@ -5,7 +5,7 @@
 #include <vulkan/vulkan.hpp>
 #include <vector>
 
-namespace core::graphics::api
+namespace bomb_engine
 {
 	class VulkanPipelineBuilder
 	{

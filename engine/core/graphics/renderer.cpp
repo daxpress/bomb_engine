@@ -1,7 +1,7 @@
 #include "core/graphics/renderer.h"
 #include "core/graphics/api_bridge.h"
 
-namespace core::graphics
+namespace bomb_engine
 {
 	Render::Render(Window& window, bool enable_validation_layers)
 	{

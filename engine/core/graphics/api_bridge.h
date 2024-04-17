@@ -5,12 +5,9 @@
 
 #include <memory>
 
-namespace core::graphics
+namespace bomb_engine
 {
-	namespace api
-	{
-		class IAPI;
-	}
+	class IAPI;
 
 	enum class E_API : uint8_t
 	{
@@ -31,6 +28,6 @@ namespace core::graphics
 
 	private:
 		// not using unique_ptr because it doesn't allow forward declaration of interface (or at least I couldn't find a solution)
-		api::IAPI* m_current_api = nullptr;
+		IAPI* m_current_api = nullptr;
 	};
 }

@@ -1,6 +1,6 @@
 #include "core/graphics/api_bridge/vulkan_pipeline_builder.h"
 
-namespace core::graphics::api
+namespace bomb_engine
 {
 	VulkanPipelineBuilder::VulkanPipelineBuilder(vk::Device device)
 		: m_device(device)

@@ -1,6 +1,6 @@
 #include "core/graphics/api_bridge/vulkan_renderpass_builder.h"
 
-namespace core::graphics::api
+namespace bomb_engine
 {
 	VulkanRenderPassBuilder::VulkanRenderPassBuilder(vk::Device device) :
 		m_device(device)

@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace core::graphics
+namespace bomb_engine
 {
 	enum class E_GRAPHICS_PIPELINE_TYPE : uint8_t
 	{

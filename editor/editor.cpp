@@ -12,8 +12,8 @@ const bool enable_layers = false;
 
 int main()
 {
-	core::graphics::Window window{1920, 1080, "Bomb Engine Editor"};
-	auto renderer = core::graphics::Render{ window, enable_layers };
+	bomb_engine::Window window{1920, 1080, "Bomb Engine Editor"};
+	auto renderer = bomb_engine::Render{ window, enable_layers };
 
 	while(window.is_open()) 
 	{

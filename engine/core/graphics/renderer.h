@@ -4,7 +4,7 @@
 #include "core/graphics/window.h"
 #include "core/graphics/api_bridge.h"
 
-namespace core::graphics
+namespace bomb_engine
 {
 	class BOMB_ENGINE_API Render
 	{

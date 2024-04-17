@@ -7,7 +7,7 @@
 
 class GLFWwindow;
 
-namespace core::graphics
+namespace bomb_engine
 {
 	class BOMB_ENGINE_API Window
 	{

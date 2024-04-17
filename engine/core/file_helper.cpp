@@ -3,7 +3,7 @@
 #include <fstream>
 
 
-namespace core::file_helper
+namespace bomb_engine::file_helper
 {
 	std::expected<filedata, file_error> load_file(const std::filesystem::path& filepath)
 	{

@@ -1,6 +1,6 @@
 #include "api_vulkan_structs.h"
 
-namespace core::graphics::api
+namespace bomb_engine
 {
 	VkSwapchainDetails::VkSwapchainDetails(vk::PhysicalDevice physical_device, vk::SurfaceKHR surface)
 	{

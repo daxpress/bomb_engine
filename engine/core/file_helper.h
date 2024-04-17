@@ -6,7 +6,7 @@
 #include <filesystem>
 #include <expected>
 
-namespace core::file_helper
+namespace bomb_engine::file_helper
 {
 	enum class file_error
 	{

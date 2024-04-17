@@ -2,7 +2,7 @@
 
 #include "core/graphics/api_bridge.h"
 
-namespace core::graphics::api
+namespace bomb_engine
 {
 	class IAPI
 	{

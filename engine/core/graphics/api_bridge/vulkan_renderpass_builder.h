@@ -4,7 +4,7 @@
 #include <map>
 #include <unordered_map>
 
-namespace core::graphics::api
+namespace bomb_engine
 {
 
 	class VulkanRenderPassBuilder

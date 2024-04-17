@@ -2,17 +2,17 @@
 #include "core/graphics/api_bridge/api_interface.h"
 #include "core/graphics/api_bridge/api_vulkan.h"
 
-namespace core::graphics
+namespace bomb_engine
 {
 	bool APIBridge::initialize(Window& window, bool enable_validation_layers, E_API desired_api)
 	{
 		switch (desired_api)
 		{
-		case core::graphics::E_API::API_VULKAN:
-			m_current_api = new api::APIVulkan(window, enable_validation_layers);
+		case E_API::API_VULKAN:
+			m_current_api = new APIVulkan(window, enable_validation_layers);
 			return true;
 			break;
-		case core::graphics::E_API::API_DIRECTX:
+		case E_API::API_DIRECTX:
 			return false;
 			break;
 		default:

@@ -5,7 +5,7 @@
 #include <cinttypes>
 #include <optional>
 
-namespace core::graphics::api
+namespace bomb_engine
 {
 	struct VkQueueFamilyIndices
 	{
