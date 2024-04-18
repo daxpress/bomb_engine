@@ -1,4 +1,4 @@
-#include "core/graphics/api_bridge/api_vulkan.h"
+#include "core/graphics/vulkan/api_vulkan.h"
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>

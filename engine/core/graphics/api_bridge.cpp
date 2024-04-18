@@ -1,6 +1,6 @@
 #include "core/graphics/api_bridge.h"
-#include "core/graphics/api_bridge/api_interface.h"
-#include "core/graphics/api_bridge/api_vulkan.h"
+#include "core/graphics/api_interface.h"
+#include "core/graphics/vulkan/api_vulkan.h"
 
 namespace bomb_engine
 {

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "core/graphics/api_bridge/api_interface.h"
+#include "core/graphics/api_interface.h"
 #include "core/graphics/window.h"
-#include "core/graphics/api_bridge/api_vulkan_structs.h"
+#include "core/graphics/vulkan/api_vulkan_structs.h"
 
 #include <vulkan/vulkan.hpp>
 #include <vector>

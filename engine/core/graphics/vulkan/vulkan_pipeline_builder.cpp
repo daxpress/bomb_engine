@@ -1,4 +1,4 @@
-#include "core/graphics/api_bridge/vulkan_pipeline_builder.h"
+#include "core/graphics/vulkan/vulkan_pipeline_builder.h"
 
 namespace bomb_engine
 {
