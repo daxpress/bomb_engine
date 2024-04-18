@@ -6,11 +6,11 @@
 
 namespace bomb_engine
 {
-	class BOMB_ENGINE_API Render
+	class BOMB_ENGINE_API Renderer
 	{
 	public:
-		Render(Window& window, bool enable_validation_layers);
-		~Render();
+		Renderer(Window& window, bool enable_validation_layers);
+		~Renderer();
 
 	private:
 		std::unique_ptr<APIBridge> m_api_bridge;

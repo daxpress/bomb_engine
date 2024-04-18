@@ -13,7 +13,7 @@ const bool enable_layers = false;
 int main()
 {
 	bomb_engine::Window window{1920, 1080, "Bomb Engine Editor"};
-	auto renderer = bomb_engine::Render{ window, enable_layers };
+	auto renderer = bomb_engine::Renderer{ window, enable_layers };
 
 	while(window.is_open()) 
 	{
