@@ -13,5 +13,6 @@ add_subdirectory(core)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(Vulkan REQUIRED)
+find_package(spirv-cross REQUIRED)
 
-target_link_libraries(bomb_engine_core glfw glm::glm Vulkan::Vulkan)
+target_link_libraries(bomb_engine_core glfw glm::glm Vulkan::Vulkan spirv-cross::spirv-cross)
