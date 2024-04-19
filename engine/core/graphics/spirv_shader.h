@@ -3,6 +3,7 @@
 #include "core/bomb_engine.h"
 
 #include <vector>
+#include <string>
 
 namespace bomb_engine
 {
