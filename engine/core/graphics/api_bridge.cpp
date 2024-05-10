@@ -20,6 +20,12 @@ namespace bomb_engine
 			break;
 		}
 	}
+
+	void APIBridge::draw_frame()
+	{
+		m_current_api->draw_frame();
+	}
+
 	APIBridge::~APIBridge()
 	{
 		if (m_current_api)

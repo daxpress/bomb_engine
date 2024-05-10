@@ -13,4 +13,8 @@ namespace bomb_engine
 	{
 
 	}
+	void Renderer::draw_frame()
+	{
+		m_api_bridge->draw_frame();
+	}
 }

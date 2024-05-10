@@ -25,9 +25,11 @@ namespace bomb_engine
 	class BOMB_ENGINE_API SPIRVShader
 	{
 	public:
-		SPIRVShader(const std::vector<unsigned char>& spirv_binary);
+		SPIRVShader() = default;
+		SPIRVShader(const std::vector<char>& spirv_binary);
 
 		inline const std::vector<uint32_t>& get_data() const { return m_data; }
+		inline const size_t get_bytes_count() const { return m_data.size() * sizeof(uint32_t); }
 		inline const E_SHADER_STAGE get_stage() const { return m_stage; }
 	private:
 

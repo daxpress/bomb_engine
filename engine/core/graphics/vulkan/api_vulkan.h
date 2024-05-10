@@ -3,6 +3,7 @@
 #include "core/graphics/api_interface.h"
 #include "core/graphics/window.h"
 #include "core/graphics/vulkan/api_vulkan_structs.h"
+#include "core/graphics/spirv_shader.h"
 
 #include <vulkan/vulkan.hpp>
 #include <vector>
@@ -16,6 +17,9 @@ namespace bomb_engine
 		virtual ~APIVulkan() override;
 
 		inline virtual E_API get_api() { return E_API::API_VULKAN; }
+		
+		// testing only, I need a starting point to work from, which in this case is a model drawn to the surface
+		virtual void draw_frame() override;
 
 
 	private:
@@ -38,6 +42,11 @@ namespace bomb_engine
 		vk::Queue m_transfer_queue;
 		vk::Queue m_compute_queue;
 		VkSwapchainInfo m_swapchain_info;
+
+		vk::Pipeline m_example_pipeline;
+		vk::PipelineLayout m_example_layout;
+		vk::RenderPass m_example_renderpass;
+		vk::DescriptorSetLayout m_example_descriptor_set_layout;
 
 	private:
 
@@ -66,5 +75,11 @@ namespace bomb_engine
 		vk::SurfaceFormatKHR choose_swapchain_surface_format(std::vector<vk::SurfaceFormatKHR> formats);
 		vk::PresentModeKHR choose_swapchain_present_mode(std::vector<vk::PresentModeKHR> present_modes);
 		vk::Extent2D choose_swapchain_extent(vk::SurfaceCapabilitiesKHR capabilities);
+
+		vk::ShaderModule create_shader_module(SPIRVShader& shader);
+		// this is required to get ourselves to draw something in the editor in order to have easier refactoring and feature introduction
+		vk::Pipeline create_example_pipeline();
+		vk::RenderPass create_example_render_pass();
+		vk::PipelineLayout create_example_pipeline_layout();
 	};
 }

@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <filesystem>
+#include <fstream>
 #include <expected>
 
 namespace bomb_engine::file_helper
@@ -15,7 +16,5 @@ namespace bomb_engine::file_helper
 		read_error,
 	};
 
-	using filedata = std::vector<std::byte>;
-
-	BOMB_ENGINE_API std::expected<filedata, file_error> load_file(const std::filesystem::path& filepath);
+	BOMB_ENGINE_API std::expected<std::vector<char>, file_error> load_file(const std::filesystem::path& filepath);
 }

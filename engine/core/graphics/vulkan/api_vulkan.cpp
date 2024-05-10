@@ -1,4 +1,6 @@
 #include "core/graphics/vulkan/api_vulkan.h"
+#include "core/file_helper.h"
+#include "core/graphics/vertex_data.h"
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -138,10 +140,16 @@ namespace bomb_engine
 		m_transfer_queue = m_device.getQueue(families.transfer.value(), 0);
 		m_compute_queue = m_device.getQueue(families.compute.value(), 0);
 		m_swapchain_info = create_swapchain(m_physical_device, m_surface, m_device);
+
+		m_example_pipeline = create_example_pipeline();
 	}
 
 	APIVulkan::~APIVulkan()
 	{
+		m_device.destroyPipeline(m_example_pipeline);
+		m_device.destroyRenderPass(m_example_renderpass);
+		m_device.destroyPipelineLayout(m_example_layout);
+		m_device.destroyDescriptorSetLayout(m_example_descriptor_set_layout);
 		for (const auto& image_view : m_swapchain_info.image_views)
 		{
 			m_device.destroyImageView(image_view);
@@ -149,6 +157,11 @@ namespace bomb_engine
 		m_device.destroySwapchainKHR(m_swapchain_info.swapchain);
 		m_device.destroy();
 		vkDestroySurfaceKHR(*m_vulkan_instance, m_surface, nullptr);
+	}
+
+	void APIVulkan::draw_frame()
+	{
+
 	}
 
 	void APIVulkan::create_instance(const Window& window, bool enable_validation_layers)
@@ -504,5 +517,183 @@ namespace bomb_engine
 		vk::Extent2D extent(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
 
 		return std::clamp(extent, capabilities.minImageExtent, capabilities.maxImageExtent);
+	}
+
+	vk::ShaderModule APIVulkan::create_shader_module(SPIRVShader& shader)
+	{
+		vk::ShaderModuleCreateInfo create_info(vk::ShaderModuleCreateFlagBits(),
+			shader.get_bytes_count(),
+			shader.get_data().data()
+		);
+		return m_device.createShaderModule(create_info);
+	}						
+
+	vk::Pipeline APIVulkan::create_example_pipeline()
+	{
+		SPIRVShader vertex, fragment;
+		if (auto vertex_file = file_helper::load_file("shaders/vertex.spv"); vertex_file.has_value())
+		{
+			vertex = SPIRVShader(vertex_file.value());
+		}
+		else
+		{
+			throw std::runtime_error("error parsing file");
+		}
+		if (auto fragment_file = file_helper::load_file("shaders/fragment.spv"); fragment_file.has_value())
+		{
+			fragment = SPIRVShader(fragment_file.value());
+		}
+		else
+		{
+			throw std::runtime_error("error parsing file");
+		}
+		auto vertex_shader = create_shader_module(vertex);
+		auto fragment_shader = create_shader_module(fragment);
+
+		vk::PipelineShaderStageCreateInfo vert_stage(vk::PipelineShaderStageCreateFlagBits(), vk::ShaderStageFlagBits::eVertex, vertex_shader, "main");
+		vk::PipelineShaderStageCreateInfo frag_stage(vk::PipelineShaderStageCreateFlagBits(), vk::ShaderStageFlagBits::eFragment, fragment_shader, "main");
+
+		std::array<vk::PipelineShaderStageCreateInfo, 2> stages{ vert_stage, frag_stage };
+
+		vk::PipelineDepthStencilStateCreateInfo depth_stencil(vk::PipelineDepthStencilStateCreateFlagBits(),
+			true,
+			true,
+			vk::CompareOp::eLess);
+
+		auto binding_desc = VertexData::get_binding_description();
+		auto attrib_desc = VertexData::get_attribute_descriptions();
+		vk::PipelineVertexInputStateCreateInfo vert_input(vk::PipelineVertexInputStateCreateFlagBits(), binding_desc, attrib_desc);
+
+		std::array<vk::DynamicState, 2> dynamic_states{ vk::DynamicState::eViewport, vk::DynamicState::eScissor };
+		vk::PipelineDynamicStateCreateInfo dynamic_state_info(vk::PipelineDynamicStateCreateFlagBits(), dynamic_states);
+
+		vk::Viewport viewport(0, 0, m_swapchain_info.extent.width, m_swapchain_info.extent.height, 0, 1);
+		vk::Rect2D scissor({ 0,0 }, m_swapchain_info.extent);
+		vk::PipelineViewportStateCreateInfo viewport_state(vk::PipelineViewportStateCreateFlagBits(), viewport, scissor);
+
+		vk::PipelineInputAssemblyStateCreateInfo input_assembly(vk::PipelineInputAssemblyStateCreateFlagBits(), vk::PrimitiveTopology::eTriangleList, false);
+
+		vk::PipelineRasterizationStateCreateInfo raster(vk::PipelineRasterizationStateCreateFlagBits(), false, false); // default is ok
+		raster.lineWidth = 1.0f;	// it was complaining, probably default is 0
+
+		vk::PipelineMultisampleStateCreateInfo multisampling(vk::PipelineMultisampleStateCreateFlagBits(), vk::SampleCountFlagBits::e8);
+
+		vk::PipelineColorBlendAttachmentState color_attachment(
+			true,
+			vk::BlendFactor::eSrcAlpha,
+			vk::BlendFactor::eOneMinusSrcAlpha, 
+			vk::BlendOp::eAdd, 
+			vk::BlendFactor::eOne, 
+			vk::BlendFactor::eZero, 
+			vk::BlendOp::eAdd, 
+			vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA);
+
+		vk::PipelineColorBlendStateCreateInfo color_blend(vk::PipelineColorBlendStateCreateFlagBits(), false, vk::LogicOp::eClear, color_attachment);
+
+		m_example_layout = create_example_pipeline_layout();
+
+		m_example_renderpass = create_example_render_pass();
+
+		vk::GraphicsPipelineCreateInfo pipeline(vk::PipelineCreateFlagBits(),
+			stages,
+			&vert_input,
+			&input_assembly,
+			nullptr,
+			&viewport_state,
+			&raster,
+			&multisampling,
+			&depth_stencil,
+			&color_blend,
+			&dynamic_state_info,
+			m_example_layout,
+			m_example_renderpass,
+			0
+		);
+
+		auto pipeline_res = m_device.createGraphicsPipeline(nullptr, pipeline);
+		if (pipeline_res.result != vk::Result::eSuccess)
+		{
+			throw std::runtime_error("failed to create graphics pipeline!");
+		}
+
+		m_device.destroyShaderModule(vertex_shader);
+		m_device.destroyShaderModule(fragment_shader);
+
+		return pipeline_res.value;
+	}
+	vk::RenderPass APIVulkan::create_example_render_pass()
+	{
+		vk::AttachmentDescription color_attachment(vk::AttachmentDescriptionFlagBits(),
+			m_swapchain_info.format,
+			vk::SampleCountFlagBits::e8,
+			vk::AttachmentLoadOp::eClear,
+			vk::AttachmentStoreOp::eStore,
+			vk::AttachmentLoadOp::eDontCare,
+			vk::AttachmentStoreOp::eDontCare,
+			vk::ImageLayout::eUndefined,
+			vk::ImageLayout::eColorAttachmentOptimal
+		);
+
+		vk::AttachmentDescription depth_attachment(vk::AttachmentDescriptionFlagBits(),
+			vk::Format::eD32SfloatS8Uint,
+			vk::SampleCountFlagBits::e8,
+			vk::AttachmentLoadOp::eDontCare,
+			vk::AttachmentStoreOp::eStore,
+			vk::AttachmentLoadOp::eDontCare,
+			vk::AttachmentStoreOp::eDontCare,
+			vk::ImageLayout::eUndefined,
+			vk::ImageLayout::eDepthStencilAttachmentOptimal);
+
+		vk::AttachmentDescription color_attachment_resolve(vk::AttachmentDescriptionFlagBits(),
+			m_swapchain_info.format,
+			vk::SampleCountFlagBits::e1,
+			vk::AttachmentLoadOp::eDontCare,
+			vk::AttachmentStoreOp::eStore,
+			vk::AttachmentLoadOp::eDontCare,
+			vk::AttachmentStoreOp::eDontCare,
+			vk::ImageLayout::eUndefined,
+			vk::ImageLayout::ePresentSrcKHR);
+
+		vk::AttachmentReference color_ref(0, vk::ImageLayout::eColorAttachmentOptimal);
+		vk::AttachmentReference depth_stencil_ref(1, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+		vk::AttachmentReference color_resolve_ref(2, vk::ImageLayout::eColorAttachmentOptimal);
+
+		vk::SubpassDescription subpass(vk::SubpassDescriptionFlagBits(),
+			vk::PipelineBindPoint::eGraphics
+		);
+		subpass.setColorAttachments(color_ref);
+		subpass.setPDepthStencilAttachment(&depth_stencil_ref);
+		subpass.setResolveAttachments(color_resolve_ref);
+
+
+		vk::SubpassDependency dependency(vk::SubpassExternal,
+			0,
+			vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eLateFragmentTests,
+			vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests,
+			vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+			vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eDepthStencilAttachmentWrite
+		);
+
+		std::array<vk::AttachmentDescription, 3> attachments { color_attachment, depth_attachment, color_attachment_resolve };
+		vk::RenderPassCreateInfo render_pass_info(vk::RenderPassCreateFlagBits(),
+			attachments,
+			subpass,
+			dependency);
+
+		return m_device.createRenderPass(render_pass_info);
+	}
+	vk::PipelineLayout APIVulkan::create_example_pipeline_layout()
+	{
+		vk::DescriptorSetLayoutBinding projection(0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex);
+		vk::DescriptorSetLayoutBinding sampler(1, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment);
+
+		std::array<vk::DescriptorSetLayoutBinding, 2> bindings{ projection, sampler };
+		
+		vk::DescriptorSetLayoutCreateInfo layout_info(vk::DescriptorSetLayoutCreateFlagBits(), bindings);
+		m_example_descriptor_set_layout = m_device.createDescriptorSetLayout(layout_info);
+
+		vk::PipelineLayoutCreateInfo pipeline_layout(vk::PipelineLayoutCreateFlagBits(), m_example_descriptor_set_layout);
+
+		return m_device.createPipelineLayout(pipeline_layout);
 	}
 }

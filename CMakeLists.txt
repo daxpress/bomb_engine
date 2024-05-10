@@ -24,6 +24,14 @@ macro(add_engine_module module_name access_specifier)
 	)
 endmacro()
 
+function(copy_to_bin_dir src_target dst_target src_relative_path dst_relative_path)
+	add_custom_command(
+		COMMAND ${CMAKE_COMMAND} -E copy_directory
+		TARGET $<TARGET_PROPERTY:${src_target},SOURCE_DIR>/${src_relative_path}
+		TARGET $<TARGET_FILE_DIR:${dst_target}>/${dst_relative_path}
+	)
+endfunction()
+
 include(ProcessorCount)
 ProcessorCount(N)
 if(NOT N EQUAL 0)

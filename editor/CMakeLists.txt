@@ -15,3 +15,12 @@ add_custom_command(TARGET bomb_engine_editor POST_BUILD
   $<TARGET_FILE_DIR:bomb_engine_editor>
   COMMAND_EXPAND_LISTS
   )
+
+# copy the shaders to the editor folder so that we can easily test things while writing the core parts
+# we'll eventually have a more refined build system
+add_custom_command(
+	TARGET bomb_engine_editor
+	COMMAND ${CMAKE_COMMAND} -E copy_directory
+	$<TARGET_PROPERTY:bomb_engine_core,SOURCE_DIR>/core/graphics/shaders
+	$<TARGET_FILE_DIR:bomb_engine_editor>/shaders
+)

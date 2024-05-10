@@ -10,5 +10,7 @@ namespace bomb_engine
 		virtual ~IAPI() {};
 		
 		inline virtual E_API get_api() = 0;
+
+		virtual void draw_frame() {};
 	};
 }

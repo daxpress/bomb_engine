@@ -23,6 +23,9 @@ namespace bomb_engine
 		[[nodiscard]]
 		bool initialize(Window& window, bool enable_validation_layers, E_API desired_api);
 
+		// a placeholder for testing while working on the vulkan renderer, later we'll fix responsabilities
+		void draw_frame();
+
 
 		~APIBridge();
 
