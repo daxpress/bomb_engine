@@ -2,15 +2,6 @@
 #include "file_helper.h"
 #include "vertex_data.h"
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
-
-#include <iostream>
-#include <map>
-#include <set>
-#include <algorithm>
-#include <array>
-
 // TODO: Replace exceptions with logs (can also throw exceptions but they must be engine-breaking!)
 
 #pragma region vulkan instance helpers

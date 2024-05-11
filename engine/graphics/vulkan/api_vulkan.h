@@ -5,9 +5,6 @@
 #include "vulkan/api_vulkan_structs.h"
 #include "spirv_shader.h"
 
-#include <vulkan/vulkan.hpp>
-#include <vector>
-
 namespace bomb_engine
 {
 	class APIVulkan : public IAPI

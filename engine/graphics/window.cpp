@@ -1,7 +1,5 @@
 #include "window.h"
 
-#include <GLFW/glfw3.h>
-
 namespace bomb_engine
 {
 	GLFWwindow* init_window(const uint32_t width, const uint32_t height, const std::string& title)

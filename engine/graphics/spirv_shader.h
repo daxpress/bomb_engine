@@ -2,9 +2,6 @@
 
 #include "bomb_engine.h"
 
-#include <vector>
-#include <string>
-
 namespace bomb_engine
 {
 	struct BOMB_ENGINE_API UniformBufferData

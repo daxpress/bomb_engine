@@ -4,8 +4,6 @@
 #include "window.h"
 #include "api_bridge.h"
 
-#include <memory>
-
 namespace bomb_engine
 {
 	class IAPI;

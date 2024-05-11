@@ -2,9 +2,6 @@
 
 #include <vulkan/vulkan.hpp>
 
-#include <cinttypes>
-#include <optional>
-
 namespace bomb_engine
 {
 	struct VkQueueFamilyIndices

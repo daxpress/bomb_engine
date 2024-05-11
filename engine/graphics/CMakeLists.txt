@@ -18,3 +18,5 @@ find_package(spirv-cross REQUIRED)
 target_link_libraries(bomb_engine_graphics
 bomb_engine_utilities
 glfw glm::glm Vulkan::Vulkan spirv-cross::spirv-cross)
+
+target_precompile_headers(bomb_engine_graphics REUSE_FROM bomb_engine_engine)

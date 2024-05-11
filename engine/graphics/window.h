@@ -2,9 +2,6 @@
 
 #include "bomb_engine.h"
 
-#include <cstdint>
-#include <string>
-
 class GLFWwindow;
 
 namespace bomb_engine

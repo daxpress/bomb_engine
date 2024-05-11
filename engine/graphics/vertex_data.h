@@ -2,11 +2,6 @@
 
 #include "bomb_engine.h"
 
-#include <glm/glm.hpp>
-#include <vulkan/vulkan.hpp>
-
-#include <vector>
-
 namespace bomb_engine
 {
 	struct BOMB_ENGINE_API VertexData

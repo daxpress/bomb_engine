@@ -20,6 +20,8 @@ if(NOT N EQUAL 0)
   set(CMAKE_BUILD_PARALLEL_LEVEL${N})
 endif()
 
+# precompiled headers stuff
+set(CMAKE_PCH_INSTANTIATE_TEMPLATES on)
 
 # =================================== HELPER MACROS AND FUNCTIONS ======================================
 
