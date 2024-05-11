@@ -1,8 +1,8 @@
 ﻿// editor.cpp : Defines the entry point for the application.
 //
 
-#include "core/graphics/window.h"
-#include "core/graphics/renderer.h"
+#include "graphics/window.h"
+#include "graphics/renderer.h"
 
 #ifdef _DEBUG
 const bool enable_layers = true;

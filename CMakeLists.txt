@@ -14,16 +14,50 @@ project (bomb_engine LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED On)
 
-# macro to add the specified directory to the engine's target directories
-# module_name is there only to help finding out what CMakeLists we are looking at (for now)
-macro(add_engine_module module_name access_specifier)
+include(ProcessorCount)
+ProcessorCount(N)
+if(NOT N EQUAL 0)
+  set(CMAKE_BUILD_PARALLEL_LEVEL${N})
+endif()
+
+
+# =================================== HELPER MACROS AND FUNCTIONS ======================================
+
+# macro to add the current directory to the engine's target directories.
+# it helps with keeping things organized including the files in a directory directly from the
+# local CMakeLists.txt file.
+# it is especially useful when some parts are private to the engine module.
+# planning to have this also include src files
+macro(add_target_subdirectory target_module access_specifier)
 	file (RELATIVE_PATH relative ${PROJECT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
-	target_include_directories(bomb_engine_core
+	target_include_directories(${target_module}
 		${access_specifier}
 		${relative}
 	)
 endmacro()
 
+# adds a new engine module as a linked library, to be called from owner of the module.
+# most of the time target_module = bomb_engine_engine, but it might be usefull to have some 
+# linking to other libraries instead
+function (add_engine_submodule target_module module_folder)
+	add_subdirectory(${module_folder})
+	set (module ${module_folder})
+	string(PREPEND module "bomb_engine_")
+	target_link_libraries(${target_module} ${module})
+endfunction()
+
+# declares a new engine module, call in the module primary CMakeLists.txt file
+function(new_engine_module module_name library_type)
+	project(${module_name})
+
+	add_library(${module_name} ${library_type})
+	target_include_directories(${module_name} 
+		PUBLIC
+		${CMAKE_CURRENT_SOURCE_DIR}
+	)
+endfunction()
+
+# copies files from a target src location to a dst target location
 function(copy_to_bin_dir src_target dst_target src_relative_path dst_relative_path)
 	add_custom_command(
 		COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -32,11 +66,7 @@ function(copy_to_bin_dir src_target dst_target src_relative_path dst_relative_pa
 	)
 endfunction()
 
-include(ProcessorCount)
-ProcessorCount(N)
-if(NOT N EQUAL 0)
-  set(CMAKE_BUILD_PARALLEL_LEVEL${N})
-endif()
+# =================================== ENGINE SUBDIRECTORIES ===================================
 
 add_subdirectory(engine)
 add_subdirectory(editor)

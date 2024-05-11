@@ -1,8 +1,8 @@
 #pragma once
 
-#include "core/bomb_engine.h"
-#include "core/graphics/window.h"
-#include "core/graphics/api_bridge.h"
+#include "bomb_engine.h"
+#include "window.h"
+#include "api_bridge.h"
 
 namespace bomb_engine
 {

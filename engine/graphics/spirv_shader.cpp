@@ -1,4 +1,4 @@
-#include "core/graphics/spirv_shader.h"
+#include "spirv_shader.h"
 
 #include <spirv_glsl.hpp>
 

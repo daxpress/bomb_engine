@@ -1,6 +1,6 @@
-#include "core/graphics/vulkan/api_vulkan.h"
-#include "core/file_helper.h"
-#include "core/graphics/vertex_data.h"
+#include "vulkan/api_vulkan.h"
+#include "file_helper.h"
+#include "vertex_data.h"
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>

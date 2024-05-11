@@ -1,7 +1,8 @@
 #pragma once
 
-#include "core/bomb_engine.h"
-#include "core/graphics/window.h"
+#include "bomb_engine.h"
+#include "window.h"
+#include "api_bridge.h"
 
 #include <memory>
 

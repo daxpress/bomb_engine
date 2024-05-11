@@ -1,5 +1,6 @@
-#include "core/graphics/renderer.h"
-#include "core/graphics/api_bridge.h"
+#include "renderer.h"
+#include "api_bridge.h"
+#include "window.h"
 
 namespace bomb_engine
 {

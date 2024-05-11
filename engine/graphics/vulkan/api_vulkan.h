@@ -1,9 +1,9 @@
 #pragma once
 
-#include "core/graphics/api_interface.h"
-#include "core/graphics/window.h"
-#include "core/graphics/vulkan/api_vulkan_structs.h"
-#include "core/graphics/spirv_shader.h"
+#include "api_interface.h"
+#include "window.h"
+#include "vulkan/api_vulkan_structs.h"
+#include "spirv_shader.h"
 
 #include <vulkan/vulkan.hpp>
 #include <vector>

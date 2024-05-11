@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/graphics/api_bridge.h"
+#include "api_bridge.h"
 
 namespace bomb_engine
 {

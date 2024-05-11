@@ -1,18 +1,9 @@
-project(bomb_engine_core)
+# declare the engine library using the module function, we need the sdame operations anyway
+new_engine_module(bomb_engine_engine STATIC)
 
-add_library(bomb_engine_core SHARED)
-
-target_include_directories(bomb_engine_core 
-	PUBLIC
-	${CMAKE_CURRENT_SOURCE_DIR}
-)
-
-add_subdirectory(core)
+# The engine code is organized into libraries that deal with specific parts (ex. graphics, scripting, ...)
+# add here all the subdirectories 
+add_engine_submodule(bomb_engine_engine utilities)
+add_engine_submodule(bomb_engine_engine graphics)
 
 # add external libraries here! it helps with keeping track of all the third party stuff
-find_package(glfw3 CONFIG REQUIRED)
-find_package(glm CONFIG REQUIRED)
-find_package(Vulkan REQUIRED)
-find_package(spirv-cross REQUIRED)
-
-target_link_libraries(bomb_engine_core glfw glm::glm Vulkan::Vulkan spirv-cross::spirv-cross)

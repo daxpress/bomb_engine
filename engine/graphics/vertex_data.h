@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/bomb_engine.h"
+#include "bomb_engine.h"
 
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.hpp>
