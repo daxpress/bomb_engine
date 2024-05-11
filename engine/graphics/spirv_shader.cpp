@@ -1,7 +1,5 @@
 #include "spirv_shader.h"
 
-#include <spirv_glsl.hpp>
-
 namespace bomb_engine
 {
 	SPIRVShader::SPIRVShader(const std::vector<char>& spirv_binary)
