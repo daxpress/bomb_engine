@@ -1,7 +1,8 @@
 #pragma once
 
-// PRECOMPILED HEADER HEADERS LIST
-// COMMON TO THE WHOLE ENGINE
+// COMMON PRECOMPILED HEADER HEADERS LIST.
+// 
+//  add here STL stuff 
 
 //structures
 #include <vector>
@@ -21,10 +22,3 @@
 #include <fstream>
 #include <cmath>
 #include <optional>
-// third party
-#include <vulkan/vulkan.hpp>
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
-#include <glm/glm.hpp>
-#include <spirv_glsl.hpp>
-#include <spirv_hlsl.hpp>

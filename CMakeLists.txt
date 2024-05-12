@@ -50,6 +50,8 @@ endfunction()
 
 # declares a new engine module, call in the module primary CMakeLists.txt file
 function(new_engine_module module_name library_type)
+	message(STATUS "adding engine module: ${module_name}")
+
 	project(${module_name})
 
 	add_library(${module_name} ${library_type})
@@ -57,6 +59,22 @@ function(new_engine_module module_name library_type)
 		PUBLIC
 		${CMAKE_CURRENT_SOURCE_DIR}
 	)
+
+	# builds a precompiled header for each module so that we can have common stl stuff in the engine one
+	# and another one in the module that contains external libraries for the module
+	get_target_property(common_pch bomb_engine_engine SOURCE_DIR)
+	set(pch_list "${common_pch}/pch.h")
+	get_target_property(local_pch ${module_name} SOURCE_DIR)
+	if(EXISTS ${local_pch}/pch.h AND NOT ${local_pch}/pch.h STREQUAL ${common_pch}/pch.h)
+		message(STATUS "found ${module_name} additional precompiled header")
+		list(APPEND pch_list "${local_pch}/pch.h")
+	endif()
+	if(NOT ${module_name} STREQUAL "bomb_engine_engine")
+		target_precompile_headers(${module_name} PUBLIC ${pch_list})
+	else()
+	message(STATUS "skipped custom precompiled header for ${module_name}")
+	endif()
+
 endfunction()
 
 # copies files from a target src location to a dst target location
@@ -72,5 +90,3 @@ endfunction()
 
 add_subdirectory(engine)
 add_subdirectory(editor)
-
-# TODO: Add tests and install targets if needed.
