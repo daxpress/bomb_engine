@@ -1,5 +1,3 @@
-#pragma once
-
 // COMMON PRECOMPILED HEADER HEADERS LIST.
 // 
 //  add here STL stuff 
