@@ -1,10 +1,9 @@
-new_engine_module(bomb_engine_graphics STATIC)
+new_engine_module(bomb_engine_graphics OBJECT)
 
 target_sources(bomb_engine_graphics
-PUBLIC 
+PRIVATE
 	"renderer.h" "window.h" "api_bridge.h" "graphics_pipeline_type.h" "api_interface.h" 
 	"spirv_shader.h" "vertex_data.h"
-PRIVATE 
 	"renderer.cpp" "window.cpp" "api_bridge.cpp"  "spirv_shader.cpp" "vertex_data.cpp"
 )
 

@@ -2,9 +2,9 @@ project(bomb_engine_editor)
 
 add_executable (bomb_engine_editor)
 
-target_sources(bomb_engine_editor PRIVATE "editor.cpp" "editor.h")
+target_sources(bomb_engine_editor PRIVATE  "editor.cpp" "editor.h")
 
-target_link_libraries(bomb_engine_editor PUBLIC bomb_engine_engine)
+target_link_libraries(bomb_engine_editor PRIVATE bomb_engine_engine)
 target_include_directories(bomb_engine_editor PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 # use the following to copy the dependant DLLs to the target folder
