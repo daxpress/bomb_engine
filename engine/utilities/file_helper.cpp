@@ -1,6 +1,6 @@
 #include "file_helper.h"
 
-namespace bomb_engine::file_helper
+namespace BE_NAMESPACE::file_helper
 {
     std::expected<std::vector<char>, file_error> load_file(const std::filesystem::path& filepath)
 	{

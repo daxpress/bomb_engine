@@ -1,6 +1,6 @@
 #include "window.h"
 
-namespace bomb_engine
+namespace BE_NAMESPACE
 {
 	GLFWwindow* init_window(const uint32_t width, const uint32_t height, const std::string& title)
 	{

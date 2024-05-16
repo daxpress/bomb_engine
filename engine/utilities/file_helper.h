@@ -7,7 +7,7 @@
 #include <fstream>
 #include <expected>
 
-namespace bomb_engine::file_helper
+namespace BE_NAMESPACE::file_helper
 {
 	enum class file_error
 	{

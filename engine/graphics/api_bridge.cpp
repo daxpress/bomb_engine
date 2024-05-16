@@ -2,7 +2,7 @@
 #include "vulkan/api_vulkan.h"
 #include "window.h"
 
-namespace bomb_engine
+namespace BE_NAMESPACE
 {
 	bool APIBridge::initialize(Window& window, bool enable_validation_layers, E_API desired_api)
 	{

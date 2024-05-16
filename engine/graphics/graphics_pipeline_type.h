@@ -1,6 +1,6 @@
 #pragma once
 
-namespace bomb_engine
+namespace BE_NAMESPACE
 {
 	enum class E_GRAPHICS_PIPELINE_TYPE : uint8_t
 	{

@@ -2,7 +2,7 @@
 
 #include <vulkan/vulkan.hpp>
 
-namespace bomb_engine
+namespace BE_NAMESPACE
 {
 	struct VkQueueFamilyIndices
 	{

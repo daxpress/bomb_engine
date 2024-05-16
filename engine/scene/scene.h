@@ -2,13 +2,17 @@
 
 #include <entt/entt.hpp>
 
-namespace bomb_engine
+namespace BE_NAMESPACE
 {
 	class Scene
 	{
 	public:
 
+		Scene() = default;
+		void Update();
+
 	private:
 		entt::registry m_registry;
+
 	};
 }

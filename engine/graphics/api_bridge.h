@@ -4,7 +4,7 @@
 #include "window.h"
 #include "api_bridge.h"
 
-namespace bomb_engine
+namespace BE_NAMESPACE
 {
 	class IAPI;
 

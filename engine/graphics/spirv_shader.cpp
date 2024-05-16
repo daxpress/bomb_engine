@@ -1,6 +1,6 @@
 #include "spirv_shader.h"
 
-namespace bomb_engine
+namespace BE_NAMESPACE
 {
 	SPIRVShader::SPIRVShader(const std::vector<char>& spirv_binary)
 	{

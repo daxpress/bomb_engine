@@ -115,7 +115,7 @@ void fill_debug_utils_messenger_create_info(vk::DebugUtilsMessengerCreateInfoEXT
 
 #pragma endregion vulkan instance helpers
 
-namespace bomb_engine
+namespace BE_NAMESPACE
 {
 	APIVulkan::APIVulkan(Window& window, bool enable_validation_layers)
 		:b_use_validation_layers(enable_validation_layers),

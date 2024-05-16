@@ -2,7 +2,7 @@
 #include "api_bridge.h"
 #include "window.h"
 
-namespace bomb_engine
+namespace BE_NAMESPACE
 {
 	Renderer::Renderer(Window& window, bool enable_validation_layers)
 	{

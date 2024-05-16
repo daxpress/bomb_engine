@@ -2,7 +2,7 @@
 
 #include "bomb_engine.h"
 
-namespace bomb_engine
+namespace BE_NAMESPACE
 {
 	struct BOMB_ENGINE_API VertexData
 	{

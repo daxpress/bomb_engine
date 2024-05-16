@@ -4,7 +4,7 @@
 
 class GLFWwindow;
 
-namespace bomb_engine
+namespace BE_NAMESPACE
 {
 	class BOMB_ENGINE_API Window
 	{

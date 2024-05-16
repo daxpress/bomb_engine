@@ -1,6 +1,6 @@
 #include "vertex_data.h"
 
-namespace bomb_engine
+namespace BE_NAMESPACE
 {
     vk::VertexInputBindingDescription VertexData::get_binding_description()
     {
