@@ -22,6 +22,7 @@ endif()
 
 # precompiled headers stuff
 set(CMAKE_PCH_INSTANTIATE_TEMPLATES on)
+# I wonder why did I even bother using precompiled headers in the first place... Waiting for good c++ modules support at this point
 
 # =================================== HELPER MACROS AND FUNCTIONS ======================================
 

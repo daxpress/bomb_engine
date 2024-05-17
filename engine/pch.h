@@ -20,5 +20,6 @@
 #include <fstream>
 #include <cmath>
 #include <optional>
+#include <functional>
 
 #define BE_NAMESPACE bomb_engine
