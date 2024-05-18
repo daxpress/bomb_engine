@@ -1,10 +1,8 @@
 #pragma once
 
-#include "bomb_engine.h"
-
 namespace BE_NAMESPACE
 {
-	struct BOMB_ENGINE_API VertexData
+	struct VertexData
 	{
 		glm::vec3 pos;
 		glm::vec3 color;

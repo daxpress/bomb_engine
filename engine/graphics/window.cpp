@@ -30,11 +30,11 @@ namespace BE_NAMESPACE
 		glfwDestroyWindow(m_raw_window);
 	}
 
-	inline bool Window::is_open()
+	bool Window::is_open()
 	{
 		return !glfwWindowShouldClose(m_raw_window);
 	}
-	inline void Window::poll_events()
+	void Window::poll_events()
 	{
 		glfwPollEvents();
 	}

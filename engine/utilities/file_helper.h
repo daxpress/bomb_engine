@@ -1,12 +1,5 @@
 #pragma once
 
-#include "bomb_engine.h"
-
-#include <vector>
-#include <filesystem>
-#include <fstream>
-#include <expected>
-
 namespace BE_NAMESPACE::file_helper
 {
 	enum class file_error
@@ -16,5 +9,5 @@ namespace BE_NAMESPACE::file_helper
 		read_error,
 	};
 
-	BOMB_ENGINE_API std::expected<std::vector<char>, file_error> load_file(const std::filesystem::path& filepath);
+	std::expected<std::vector<char>, file_error> load_file(const std::filesystem::path& filepath);
 }

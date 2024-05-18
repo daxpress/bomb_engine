@@ -21,5 +21,9 @@
 #include <cmath>
 #include <optional>
 #include <functional>
+#include <expected>
+#include <filesystem>
+
+// macros
 
 #define BE_NAMESPACE bomb_engine

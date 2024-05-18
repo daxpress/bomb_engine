@@ -1,12 +1,10 @@
 #pragma once
 
-#include "bomb_engine.h"
-
 class GLFWwindow;
 
 namespace BE_NAMESPACE
 {
-	class BOMB_ENGINE_API Window
+	class Window
 	{
 	public:
 		/// <summary>
@@ -16,8 +14,8 @@ namespace BE_NAMESPACE
 		Window(const uint32_t width, const uint32_t height, const std::string& title);
 		~Window();
 
-		inline bool is_open();
-		inline void poll_events();
+		bool is_open();
+		void poll_events();
 
 		inline const std::string& get_title() const { return m_title; }
 		inline GLFWwindow* get_raw_window() const { return m_raw_window; }

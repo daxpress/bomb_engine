@@ -1,10 +1,8 @@
 #pragma once
 
-#include "bomb_engine.h"
-
 namespace BE_NAMESPACE
 {
-	struct BOMB_ENGINE_API UniformBufferData
+	struct UniformBufferData
 	{
 		std::string name;
 		uint32_t binding;
@@ -19,7 +17,7 @@ namespace BE_NAMESPACE
 		MESH
 	};
 
-	class BOMB_ENGINE_API SPIRVShader
+	class SPIRVShader
 	{
 	public:
 		SPIRVShader() = default;

@@ -1,12 +1,11 @@
 #pragma once
 
-#include "bomb_engine.h"
 #include "window.h"
 #include "api_bridge.h"
 
 namespace BE_NAMESPACE
 {
-	class BOMB_ENGINE_API Renderer
+	class Renderer
 	{
 	public:
 		Renderer(Window& window, bool enable_validation_layers);

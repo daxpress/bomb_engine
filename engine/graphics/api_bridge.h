@@ -1,6 +1,5 @@
 #pragma once
 
-#include "bomb_engine.h"
 #include "window.h"
 #include "api_bridge.h"
 
@@ -14,7 +13,7 @@ namespace BE_NAMESPACE
 		API_DIRECTX = 1,
 	};
 
-	class BOMB_ENGINE_API APIBridge
+	class APIBridge
 	{
 	public:
 		APIBridge() = default;
