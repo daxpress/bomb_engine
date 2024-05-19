@@ -88,6 +88,18 @@ function(copy_to_bin_dir src_target dst_target src_relative_path dst_relative_pa
 	)
 endfunction()
 
+# populates the out_headers parameter with the engine headers list and the out_libs with the engine modules
+# very useful to generate bindings for a scripting language
+# do not use __linked_libs or __headers as they are variables set here in the macro
+macro(get_engine_headers out_headers out_libs)
+	get_target_property(__linked_libs bomb_engine_engine LINK_LIBRARIES)
+	list(APPEND ${out_libs} ${__linked_libs})
+	foreach(lib ${__linked_libs})
+		get_target_property(__headers ${lib} HEADER_SET_HEADERS)
+		list(APPEND ${out_headers} ${__headers})
+		endforeach()
+endmacro()
+
 # =================================== ENGINE SUBDIRECTORIES ===================================
 
 add_subdirectory(engine)

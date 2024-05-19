@@ -2,8 +2,10 @@ new_engine_module(bomb_engine_scene OBJECT)
 
 target_sources(bomb_engine_scene 
 PRIVATE
-	"scene.h" "entity.h" 
 	"scene.cpp" "entity.cpp"
+PRIVATE
+FILE_SET HEADERS FILES
+	"scene.h" "entity.h" 
 )
 
 find_package(EnTT CONFIG REQUIRED)
