@@ -1,0 +1,1 @@
+project(pybomb LANGUAGES CXX)
