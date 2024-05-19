@@ -27,3 +27,12 @@
 // macros
 
 #define BE_NAMESPACE bomb_engine
+
+// mark a class, struct or function with this special macro to tell to expose it 
+// to a scripting system (maybe reflection in future).
+// can specify an access specifier to tell down to what accessibility level you want to expose:
+// public => exposes only public members and methods
+// protected => exposes public and protected members and methods
+// private => exposes all members and methods
+//  Note: it is ignored for a function
+#define expose(access_specifier)
