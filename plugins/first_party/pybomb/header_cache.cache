@@ -1,0 +1,14 @@
+engine/utilities/file_helper.h=3ff17befcd4ec4c9c11dd37307c75c93
+engine/graphics/renderer.h=0e6aeb9ed9c4a655f26d9acbef59f1e4
+engine/graphics/window.h=4ae8cfde18955f2d1a5cc585b4d353a9
+engine/graphics/api_bridge.h=973aa3c03a5e399f03950845cc3ce93c
+engine/graphics/graphics_pipeline_type.h=bf5eb9ce93155cc3216402a4d8776ddf
+engine/graphics/api_interface.h=678b87cd630559b3f680101b8a4f4e5c
+engine/graphics/spirv_shader.h=add1a35a2f7989694cc97de67348931c
+engine/graphics/vertex_data.h=b5f40c29cacc514fad93255ae73851ea
+engine/graphics/vulkan/api_vulkan.h=27632ed4847c8ba521be2b1544161aa8
+engine/graphics/vulkan/api_vulkan_structs.h=a63ff8b99f245463eb16b612fbac62ee
+engine/script/scriptable.h=f48f46c6572e8bc75d978cc26748ef79
+engine/script/native_script.h=a0ecedf73df9abafa85f21993176d42b
+engine/scene/scene.h=083c99b8a5b67cb1f4d880541be3927d
+engine/scene/entity.h=bcf7d59f8545eb0a48101aaa2b196e80

@@ -9,8 +9,8 @@ set(headers)
 set(libs)
 get_engine_headers(headers libs)
 
-set(pybinder "pybinder.py")
-find_package(Python COMPONENTS Interpreter REQUIRED)
+set(pybinder "pybinder/pybinder.py")
+find_package(Python COMPONENTS Interpreter Development REQUIRED)
 
 # runs the binder script
 add_custom_command(TARGET pybomb PRE_BUILD 
