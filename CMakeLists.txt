@@ -61,6 +61,9 @@ function(new_engine_module module_name library_type)
 		${CMAKE_CURRENT_SOURCE_DIR}
 	)
 
+	# set dependancy to header_tool to allow generated code to compile
+	add_dependencies(${module_name} header_tool)
+
 	# builds a precompiled header for each module so that we can have common stl stuff in the engine one
 	# and another one in the module that contains external libraries for the module
 	get_target_property(common_pch bomb_engine_engine SOURCE_DIR)
