@@ -1,5 +1,4 @@
 import difflib
-import multiprocessing
 import os
 from pathlib import Path
 
@@ -28,7 +27,6 @@ class HeaderTool:
             os.mkdir(self.generated_headers_dir)
 
     def run(self):
-        cpu_count = multiprocessing.cpu_count()
         for (header, op) in self.headers:
             self.operation[op](header)
 

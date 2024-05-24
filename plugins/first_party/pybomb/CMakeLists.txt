@@ -9,9 +9,12 @@ set(headers)
 set(libs)
 get_engine_headers(headers libs)
 
-set(pybinder "pybinder/pybinder.py")
-find_package(Python COMPONENTS Interpreter Development REQUIRED)
-
-# runs the binder script
-add_custom_command(TARGET pybomb PRE_BUILD 
-	COMMAND ${Python_EXECUTABLE} ${pybinder} ARGS ${headers} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+set(generated_dir "${CMAKE_CURRENT_BINARY_DIR}/generated")
+# declare the binder program as usual
+add_executable(python_binder "python_binder/main.cpp")
+# set a new target that depends on the binder build and generated files
+add_custom_target(bind_phase DEPENDS python_binder generated_dir)
+# add command that runs the binder after the binder is compiled to produce generated headers
+add_custom_command(OUTPUT generated_dir WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} COMMAND python_binder headers)
+# finally, add a dependency to bind_phase execution, so that it will compile pybomb after having the generated files
+add_dependencies(pybomb bind_phase)
