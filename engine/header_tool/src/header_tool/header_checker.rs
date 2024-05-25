@@ -52,7 +52,7 @@ impl HeaderChecker {
             .par_bridge()
             .map(|x| {
                 let line = x.unwrap();
-                let subs: Vec<&str> = line.split(":").collect();
+                let subs: Vec<&str> = line.split("=").collect();
                 (String::from(subs[0]), String::from(subs[1]))
             })
             .collect();
@@ -71,11 +71,6 @@ impl HeaderChecker {
             .collect();
         // because we could only get the Add and Update operations, now we check for Removals
         // by comparing the cached headers with the passed headers instead;
-        // to do this we first need to get them relative to the engine dir.
-        let headers: Vec<String> = headers
-            .par_iter()
-            .map(|header| Self::relative_header(header))
-            .collect();
         let mut remove: Vec<HeaderCacheOp> = self
             .headers_cache
             .clone()
@@ -96,26 +91,17 @@ impl HeaderChecker {
         // using Sha1 instead of Md5 this time - it doesn't really change much in this context
         let hasher = Sha1::from(&content);
         let hash = hasher.digest().to_string();
-        // we trim the headers to have a path relative to bomb_engine
-        let trimmed = Self::relative_header(header);
         // now se what operation to run
-        if self.headers_cache.contains_key(&trimmed) {
+        if self.headers_cache.contains_key(header) {
             // if is in cache then:
-            if self.headers_cache[&trimmed] != hash {
-                HeaderCacheOp::Update(trimmed, hash)
+            if self.headers_cache[header] != hash {
+                HeaderCacheOp::Update(header.to_string(), hash)
             } else {
                 HeaderCacheOp::Skip
             }
         } else {
-            HeaderCacheOp::Add(trimmed, hash)
+            HeaderCacheOp::Add(header.to_string(), hash)
         }
-    }
-
-    /// Returns a header file with path relative to bomb_engine dir
-    fn relative_header(header: &String) -> String {
-        const ENGINE_DIR: &'static str = "/bomb_engine/";
-        let start = header.find(ENGINE_DIR).unwrap() + ENGINE_DIR.len();
-        header.split_at(start).1.to_string()
     }
 
     /// writes the caceh back to disk
@@ -123,7 +109,7 @@ impl HeaderChecker {
         let file = File::create(Path::new(CACHE_NAME)).unwrap();
         let mut writer = io::BufWriter::new(file);
         for (header, hash) in &self.headers_cache {
-            writeln!(writer, "{header}:{hash}").unwrap();
+            writeln!(writer, "{header}={hash}").unwrap();
         }
         writer.flush().unwrap()
     }
