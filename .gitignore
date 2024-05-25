@@ -53,4 +53,4 @@ build/
 *generated/
 
 # Rust header tool compiled stuff (might contain stuff from development testing in vscode)
-header_tool/target
+header_tool/target/

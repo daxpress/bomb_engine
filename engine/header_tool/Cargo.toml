@@ -8,3 +8,5 @@ edition = "2021"
 [dependencies]
 clang = { version = "*" }
 anyhow = "*"
+rayon = "*"
+sha1_smol = {version = "*", features = ["std"]}

@@ -13,11 +13,9 @@ impl HeaderTool {
 
     pub fn run(&self, headers: &[String]) -> Result<(), anyhow::Error>{
     println!("Running Header Tool...");
-    // first print the list of headers
-    println!("Headers:\n{:#?}", headers);
     let mut checker = header_checker::HeaderChecker::new();
-    checker.run_check(headers);
-
+    let result = checker.run_check(headers);
+    println!("{result:#?}");
     println!("All Done.");
     Ok(())
     }
