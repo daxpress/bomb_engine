@@ -1,7 +1,6 @@
 #pragma once
 
 #include "window.h"
-#include "api_bridge.h"
 
 namespace BE_NAMESPACE
 {

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use clang::*;
 
-mod enitities_representations;
+pub mod enitities_representations;
 use enitities_representations::*;
 
 pub struct HeaderParser {
@@ -10,7 +10,17 @@ pub struct HeaderParser {
     supported_entities: HashSet<EntityKind>,
 }
 
-const ARGS: [&'static str; 3] = ["--language=c++", "--std=c++23", "--stdlib=libc++23"];
+const ARGS: [&'static str; 7] = [
+    "--language=c++",
+    "--std=c++23",
+    "--stdlib=libc++23",
+    "--system-header-prefix=test",
+    // the following definitions are needed in order to not include other headers in the tu to read info.
+    // it really isn't a problem as the funcionality must be coherent anyway.
+    "-DBE_NAMESPACE=bomb_engine",
+    "-Dexpose=clang::annotate(\"expose\")",
+    "-Dhide=clang::annotate(\"hide\")",
+];
 
 const EXPOSE_NAME: &'static str = "expose";
 const HIDE_NAME: &'static str = "hide";
@@ -36,8 +46,11 @@ impl HeaderParser {
 
     /// Parses all the headers in a slice.
     pub fn parse_header_collection(&self, headers: &[&str]) -> Vec<Namespace> {
-        let index = Index::new(&self.clang, false, true);
-        headers.iter().map(|header| {self.parse_header(&index, header)}).collect()
+        let index = Index::new(&self.clang, false, false);
+        headers
+            .iter()
+            .map(|header| self.parse_header(&index, header))
+            .collect()
     }
 
     /// Used to filter the entities to only the ones we want to support.
@@ -52,20 +65,25 @@ impl HeaderParser {
             .parser(header)
             .skip_function_bodies(true)
             .ignore_non_errors_from_included_files(true)
+            .detailed_preprocessing_record(true)
             .arguments(&ARGS)
             .parse()
             .unwrap();
+
         // we pass the first entity (no namespace basically) to start the parsing
         // of the information contained inside the unit.
         // the engine code style wants just one namespace, however some might not follow
         // that and even if it's not okay to do so we will support multiple namespaces.
         // because of the guidelines it should be unlikely to have crazy namespaces nesting,
         // so it is fine to use a recursive algorithm here.
-        self.parse_namespace(&tu.get_entity())
+        self.parse_namespace(&tu.get_entity()).unwrap_or(Namespace::default())
     }
 
     /// Recursively visits the namespace to find entites to expose.
-    fn parse_namespace(&self, namespace: &Entity) -> Namespace {
+    fn parse_namespace(&self, namespace: &Entity) -> Option<Namespace> {
+        if !namespace.is_in_main_file() {
+            return None;
+        }
         let mut namespace_info = Namespace::default();
         // if the namespace is empty the name will be the header file instead.
         namespace_info.name = namespace.get_display_name().unwrap();
@@ -78,7 +96,9 @@ impl HeaderParser {
         for entity in parsed_entities.iter() {
             match entity.get_kind() {
                 EntityKind::Namespace => {
-                    namespace_info.namespaces.push(self.parse_namespace(entity))
+                    if let Some(namespace) = self.parse_namespace(entity) {
+                        namespace_info.namespaces.push(namespace);
+                    }
                 }
                 EntityKind::ClassDecl => {
                     if let Some(class) = Self::parse_class(entity) {
@@ -108,7 +128,7 @@ impl HeaderParser {
                 _ => (),
             }
         }
-        namespace_info
+        Some(namespace_info)
     }
 
     fn marked_as_exposed(entity: &Entity) -> bool {
@@ -211,7 +231,7 @@ impl HeaderParser {
         //println!("{en:#?}");
         Some(enum_info)
     }
-    
+
     fn parse_func(func: &Entity) -> Option<Function> {
         if !Self::marked_as_exposed(func) {
             return None;
@@ -234,10 +254,7 @@ impl HeaderParser {
         }
         let mut var_info = Variable::default();
         var_info.name = var.get_display_name().unwrap_or("".to_owned());
-        var_info.var_type = var
-            .get_type()
-            .unwrap()
-            .get_display_name();
+        var_info.var_type = var.get_type().unwrap().get_display_name();
         var_info.is_const = var.get_type().unwrap().is_const_qualified();
         var_info.is_static =
             var.get_storage_class().unwrap_or(StorageClass::Auto) == StorageClass::Static;
@@ -271,13 +288,11 @@ impl HeaderParser {
     }
 
     fn parse_args(args: Vec<Entity>) -> Vec<Argument> {
-        args.iter().map(|arg| {
+        args.iter()
+            .map(|arg| {
                 let mut arg_info = Argument::default();
                 arg_info.name = arg.get_display_name().unwrap_or("".to_owned());
-                arg_info.var_type = arg
-                    .get_type()
-                    .unwrap()
-                    .get_display_name();
+                arg_info.var_type = arg.get_type().unwrap().get_display_name();
                 arg_info.is_const = arg.get_type().unwrap().is_const_qualified();
                 arg_info
             })
@@ -296,10 +311,7 @@ impl HeaderParser {
             Accessibility::Protected => AccessModifier::Protected,
             Accessibility::Private => AccessModifier::Private,
         };
-        member_info.var_type = member
-            .get_type()
-            .unwrap()
-            .get_display_name();
+        member_info.var_type = member.get_type().unwrap().get_display_name();
         // remove the `const` if present
         if let Some(stripped) = member_info.var_type.strip_prefix("const ") {
             member_info.var_type = stripped.to_owned();

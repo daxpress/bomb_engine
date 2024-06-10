@@ -10,12 +10,6 @@ use std::{
 
 const CACHE_NAME: &'static str = "headercache.cache";
 
-/// Performs checks on the headers to know which operations to perform for each header.
-/// Loads a cache (if present) upon run_check() and writes the updated one when dropped.
-pub struct HeaderChecker {
-    headers_cache: HashMap<String, String>,
-}
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum HeaderCacheOp {
     Add(String, String),
@@ -24,14 +18,33 @@ pub enum HeaderCacheOp {
     Skip,
 }
 
+impl HeaderCacheOp {
+    pub fn get_header(&self) -> &str {
+        match self {
+            HeaderCacheOp::Add(header, _) => &header,
+            HeaderCacheOp::Update(header, _) => &header,
+            HeaderCacheOp::Remove(header) => &header,
+            HeaderCacheOp::Skip => "",
+        }
+    }
+}
+
+/// Performs checks on the headers to know which operations to perform for each header.
+/// Loads a cache (if present) upon run_check() and writes the updated one when dropped.
+pub struct HeaderChecker {
+    headers_cache: HashMap<String, String>,
+    operations: Vec<HeaderCacheOp>,
+}
+
 impl HeaderChecker {
     pub fn new() -> Self {
         HeaderChecker {
             headers_cache: HashMap::new(),
+            operations: Vec::new(),
         }
     }
 
-    pub fn run_check(&mut self, headers: &[String]) -> Vec<HeaderCacheOp> {
+    pub fn run_check(&mut self, headers: &[String]) {
         println!("Checking Headers...");
         match self.read_cache() {
             Result::Ok(cache) => self.headers_cache = cache,
@@ -40,7 +53,24 @@ impl HeaderChecker {
         let result = self.filter_headers(headers.to_vec());
         //println!("Check result: {:#?}", result);
         self.update_cache(&result);
-        return result;
+        self.operations = result
+    }
+
+    pub fn headers_to_generate(&self) -> Vec<&str> {
+        let filtered: Vec<&str> = self.operations.iter().filter(|op| match op {
+            HeaderCacheOp::Add(_, _) => true,
+            HeaderCacheOp::Update(_, _) => true,
+            _ => false
+        }).map(|op| op.get_header()).collect();
+        filtered
+    }
+
+    pub fn headers_to_delete(&self) -> Vec<&str> {
+        let filtered: Vec<&str> = self.operations.iter().filter(|op| match op {
+            HeaderCacheOp::Remove(_) => true,
+            _ => false
+        }).map(|op| op.get_header()).collect();
+        filtered
     }
 
     /// Reads the cache from disk and returns HashMap<header, content_hash>
@@ -121,7 +151,8 @@ impl HeaderChecker {
                 }
                 HeaderCacheOp::Skip => (),
                 HeaderCacheOp::Add(header, hash) | HeaderCacheOp::Update(header, hash) => {
-                    self.headers_cache.insert(header.to_string(), hash.to_string());
+                    self.headers_cache
+                        .insert(header.to_string(), hash.to_string());
                 }
             }
         }

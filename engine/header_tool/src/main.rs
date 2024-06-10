@@ -1,5 +1,5 @@
 use std::{env::args, fmt::Display, error::Error};
-mod header_tool;
+use header_tool::header_tool;
 
 fn main() -> Result<(), anyhow::Error> {
     let args = args();
@@ -9,8 +9,7 @@ fn main() -> Result<(), anyhow::Error> {
     }
     let args: Vec<String> = args.collect();
 
-    let header_tool = header_tool::HeaderTool::new();
-    return header_tool.run(&args[1..]);
+    return header_tool::run(&args[1..]);
 }
 
 #[derive(Debug, Clone)]
