@@ -13,6 +13,7 @@ project (bomb_engine LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED On)
+set(CMAKE_CXX_SCAN_FOR_MODULES Off)
 
 include(ProcessorCount)
 ProcessorCount(N)

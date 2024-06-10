@@ -1,9 +1,7 @@
 use std::{env::args, fmt::Display, error::Error};
-use std::env;
 mod header_tool;
 
 fn main() -> Result<(), anyhow::Error> {
-    println!("Working Directory: {:?}",env::current_dir().unwrap());
     let args = args();
     if args.len() <= 1 {
         let error = anyhow::anyhow!(ArgsError);

@@ -1,10 +1,10 @@
 use anyhow::{self, Ok};
-use header_checker::HeaderChecker;
-use header_generator::HeaderGenerator;
+use checker::HeaderChecker;
+use generator::Generator;
 
-mod header_checker;
-mod header_parser;
-mod header_generator;
+mod checker;
+mod parser;
+mod generator;
 pub struct HeaderTool {
 
 }
@@ -18,8 +18,8 @@ impl HeaderTool {
     println!("Running Header Tool...");
     let mut checker = HeaderChecker::new();
     let operations = checker.run_check(headers);
-    let generator = HeaderGenerator::new(operations);
-    generator.generate_headers();
+    let generator = Generator::new(operations);
+    generator.generate_info();
     println!("All Done.");
     Ok(())
     }
