@@ -12,6 +12,7 @@ pub enum AccessModifier {
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Function {
     pub name: String,
+    pub brief: String,
     pub return_type: String,
     pub args: Vec<Argument>,
     pub is_static: bool,
@@ -21,6 +22,7 @@ pub struct Function {
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Method {
     pub name: String,
+    pub brief: String,
     pub return_type: String,
     pub args: Vec<Argument>,
     pub access: AccessModifier,
@@ -33,6 +35,7 @@ pub struct Method {
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Variable {
     pub name: String,
+    pub brief: String,
     pub var_type: String,
     pub is_static: bool,
     pub is_const: bool,
@@ -41,15 +44,20 @@ pub struct Variable {
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Member {
     pub name: String,
+    pub brief: String,
     pub var_type: String,
     pub is_static: bool,
     pub is_const: bool,
     pub access: AccessModifier,
+    pub offset: usize,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Class {
     pub name: String,
+    pub brief: String,
+    pub size: usize,
+    pub alignment: usize,
     pub members: Vec<Member>,
     pub methods: Vec<Method>,
 }
@@ -57,6 +65,7 @@ pub struct Class {
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Enum {
     pub name: String,
+    pub brief: String,
     pub underlying_type: String,
     pub enumerators: Vec<Enumerator>,
 }
@@ -92,6 +101,9 @@ pub struct Argument {
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Struct {
     pub name: String,
+    pub brief: String,
+    pub size: usize,
+    pub alignment: usize,
     pub members: Vec<Member>,
     pub methods: Vec<Method>,
 }
@@ -102,6 +114,9 @@ impl Struct {
             members: class.members,
             methods: class.methods,
             name: class.name,
+            size: class.size,
+            alignment: class.alignment,
+            brief: class.brief
         }
     }
 }

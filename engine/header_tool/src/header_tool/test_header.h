@@ -8,18 +8,20 @@
 
 namespace exposition
 {
-
+    /// @brief this is a brief description.
     class [[expose]] ThisIsClass
     {
     public:
         int pub_int = 0;
 
+        /// @brief method brief.
         void pub_met() {};
 
         [[hide]]
         void hidden() {};
 
     private:
+        /// @brief member brief.
         const int priv_int = -1;
         static bool is_static;
         std::string string;
@@ -32,10 +34,11 @@ namespace exposition
     {
         ThisIsClass *ptr;
         ThisIsClass &reference;
+        char achar;
 
         ThisIsClass* returns_ptr() const { return ptr; };
     };
-
+    /// @brief enum brief.
     enum class [[expose]] E_123
     {
         E1,
@@ -49,6 +52,7 @@ namespace exposition
         return std::nullopt;
     };
 
+    // simple comment
     class [[expose]] OOPs 
     {
         public:
@@ -70,12 +74,14 @@ class [[expose]] AbstractClass
     virtual void virtual_with_default_impl(){};
 };
 
+/// @brief function brief.
 [[expose]]
 int outofnamespace(int c)
 {
     return 1;
 }
 
+/// @brief variable brief.
 [[expose]]
 std::string iamvar = "";
 

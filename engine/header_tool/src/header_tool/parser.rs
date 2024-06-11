@@ -76,7 +76,8 @@ impl HeaderParser {
         // that and even if it's not okay to do so we will support multiple namespaces.
         // because of the guidelines it should be unlikely to have crazy namespaces nesting,
         // so it is fine to use a recursive algorithm here.
-        self.parse_namespace(&tu.get_entity()).unwrap_or(Namespace::default())
+        self.parse_namespace(&tu.get_entity())
+            .unwrap_or(Namespace::default())
     }
 
     /// Recursively visits the namespace to find entites to expose.
@@ -154,6 +155,9 @@ impl HeaderParser {
         let mut class_info = Class::default();
 
         class_info.name = class.get_display_name().unwrap();
+        class_info.size = class.get_type().unwrap().get_sizeof().unwrap();
+        class_info.alignment = class.get_type().unwrap().get_alignof().unwrap();
+        class_info.brief = class.get_comment_brief().unwrap_or_default();
         // get methods
         let methods: Vec<Entity> = class
             .get_children()
@@ -174,7 +178,7 @@ impl HeaderParser {
             .collect();
 
         for member in members.iter() {
-            if let Some(member) = Self::parse_member(member) {
+            if let Some(member) = Self::parse_member(member, class) {
                 class_info.members.push(member);
             }
         }
@@ -191,7 +195,7 @@ impl HeaderParser {
             .collect();
 
         for member in static_members.iter() {
-            if let Some(member) = Self::parse_static_member(member) {
+            if let Some(member) = Self::parse_static_member(member, class) {
                 class_info.members.push(member);
             }
         }
@@ -213,6 +217,7 @@ impl HeaderParser {
         let mut enum_info = Enum::default();
         enum_info.name = en.get_display_name().unwrap();
         enum_info.underlying_type = en.get_enum_underlying_type().unwrap().get_display_name();
+        enum_info.brief = en.get_comment_brief().unwrap_or_default();
         let values: Vec<Entity> = en
             .get_children()
             .into_iter()
@@ -228,7 +233,7 @@ impl HeaderParser {
                 })
                 .collect();
         }
-        //println!("{en:#?}");
+
         Some(enum_info)
     }
 
@@ -241,10 +246,11 @@ impl HeaderParser {
         func_info.is_const = func.is_const_method();
         func_info.is_static = func.is_static_method();
         func_info.return_type = func.get_result_type().unwrap().get_display_name();
+        func_info.brief = func.get_comment_brief().unwrap_or("".to_string());
         if let Some(args) = func.get_arguments() {
             func_info.args = Self::parse_args(args);
         };
-        //println!("{func:#?}");
+
         Some(func_info)
     }
 
@@ -253,12 +259,13 @@ impl HeaderParser {
             return None;
         }
         let mut var_info = Variable::default();
-        var_info.name = var.get_display_name().unwrap_or("".to_owned());
+        var_info.name = var.get_display_name().unwrap_or_default();
         var_info.var_type = var.get_type().unwrap().get_display_name();
         var_info.is_const = var.get_type().unwrap().is_const_qualified();
         var_info.is_static =
             var.get_storage_class().unwrap_or(StorageClass::Auto) == StorageClass::Static;
-        //println!("{var:#?}");
+        var_info.brief = var.get_comment_brief().unwrap_or_default();
+
         Some(var_info)
     }
 
@@ -278,12 +285,12 @@ impl HeaderParser {
         method_info.is_virtual = method.is_virtual_method();
         method_info.is_pure_virtual = method.is_pure_virtual_method();
         method_info.is_static = method.is_static_method();
+        method_info.brief = method.get_comment_brief().unwrap_or_default();
 
         if let Some(args) = method.get_arguments() {
             method_info.args.reserve(args.len());
             method_info.args = Self::parse_args(args)
         }
-        //println!("{method:#?}");
         Some(method_info)
     }
 
@@ -291,7 +298,7 @@ impl HeaderParser {
         args.iter()
             .map(|arg| {
                 let mut arg_info = Argument::default();
-                arg_info.name = arg.get_display_name().unwrap_or("".to_owned());
+                arg_info.name = arg.get_display_name().unwrap_or_default();
                 arg_info.var_type = arg.get_type().unwrap().get_display_name();
                 arg_info.is_const = arg.get_type().unwrap().is_const_qualified();
                 arg_info
@@ -299,7 +306,7 @@ impl HeaderParser {
             .collect()
     }
 
-    fn parse_member(member: &Entity) -> Option<Member> {
+    fn parse_member(member: &Entity, owner: &Entity) -> Option<Member> {
         if Self::marked_as_hidden(member) {
             return None;
         }
@@ -316,13 +323,21 @@ impl HeaderParser {
         if let Some(stripped) = member_info.var_type.strip_prefix("const ") {
             member_info.var_type = stripped.to_owned();
         };
-        // static types not supported yet...
-        //println!("{member:#?}");
+
+        member_info.offset = owner
+            .get_type()
+            .unwrap()
+            .get_offsetof(&member.get_name().unwrap())
+            .unwrap_or(0)
+            / 8;
+
+            member_info.brief = member.get_comment_brief().unwrap_or_default();
+
         Some(member_info)
     }
 
-    fn parse_static_member(member: &Entity) -> Option<Member> {
-        let option = Self::parse_member(member);
+    fn parse_static_member(member: &Entity, owner: &Entity) -> Option<Member> {
+        let option = Self::parse_member(member, owner);
         if let Some(mut member) = option {
             member.is_static = true;
             Some(member)
