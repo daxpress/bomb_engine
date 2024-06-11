@@ -149,6 +149,7 @@ impl HeaderParser {
     }
 
     fn parse_class(class: &Entity) -> Option<Class> {
+        // TODO Parse destructor,constructor methods and other special methods.
         if !Self::marked_as_exposed(class) {
             return None;
         }
