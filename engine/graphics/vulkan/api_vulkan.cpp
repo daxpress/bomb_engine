@@ -208,7 +208,10 @@ namespace BE_NAMESPACE
 
 		m_vulkan_instance = vk::createInstanceUnique(createinfo);
 
-		setup_debug_messenger(m_vulkan_instance, messenger_info);
+		if (enable_validation_layers)
+		{
+			setup_debug_messenger(m_vulkan_instance, messenger_info);
+		}
 	}
 
 	void APIVulkan::setup_debug_messenger(vk::UniqueInstance& instance, vk::DebugUtilsMessengerCreateInfoEXT& messenger_info)
