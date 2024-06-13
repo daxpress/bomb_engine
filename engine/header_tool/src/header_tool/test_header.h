@@ -36,8 +36,16 @@ namespace exposition
         ThisIsClass &reference;
         char achar;
 
-        ThisIsClass* returns_ptr() const { return ptr; };
+        ThisIsClass *returns_ptr() const { return ptr; };
     };
+
+    struct [[expose]] AnotherStruct
+    {
+        ThisIsClass &reference;
+
+        explicit operator ThisIsStruct() const { return ThisIsStruct{.ptr = nullptr, .reference = reference}; }
+    };
+
     /// @brief enum brief.
     enum class [[expose]] E_123
     {
@@ -53,25 +61,30 @@ namespace exposition
     };
 
     // simple comment
-    class [[expose]] OOPs 
+    class [[expose]] OOPs
     {
-        public:
+    public:
         OOPs();
-        OOPs(OOPs& other);
-        OOPs(OOPs&& other);
-        OOPs& operator=(OOPs& other); 
-        OOPs& operator=(OOPs&& other);
+        OOPs(OOPs &other);
+        OOPs(OOPs &&other);
+        OOPs &operator=(OOPs &other);
+        OOPs &operator=(OOPs &&other);
 
         ~OOPs();
     };
 }
 
-class [[expose]] AbstractClass 
+class [[expose]] AbstractClass
 {
-    public: 
-
+public:
     virtual void i_am_abstract() = 0;
-    virtual void virtual_with_default_impl(){};
+    virtual void virtual_with_default_impl() {};
+};
+
+class [[expose]] ConcreteClass : public AbstractClass 
+{
+    public:
+    virtual void i_am_abstract() override {};
 };
 
 /// @brief function brief.
@@ -87,3 +100,6 @@ std::string iamvar = "";
 
 [[expose]]
 static int static_variable;
+
+template<typename T>
+auto template_function(T& somevalue) -> void {}

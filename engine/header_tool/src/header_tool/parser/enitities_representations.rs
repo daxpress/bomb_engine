@@ -58,6 +58,8 @@ pub struct Class {
     pub brief: String,
     pub size: usize,
     pub alignment: usize,
+    pub constructors: Vec<Method>,
+    pub destructor: Method,
     pub members: Vec<Member>,
     pub methods: Vec<Method>,
 }
@@ -104,6 +106,8 @@ pub struct Struct {
     pub brief: String,
     pub size: usize,
     pub alignment: usize,
+    pub constructors: Vec<Method>,
+    pub destructor: Method,
     pub members: Vec<Member>,
     pub methods: Vec<Method>,
 }
@@ -116,7 +120,9 @@ impl Struct {
             name: class.name,
             size: class.size,
             alignment: class.alignment,
-            brief: class.brief
+            brief: class.brief,
+            constructors: class.constructors,
+            destructor: class.destructor,
         }
     }
 }

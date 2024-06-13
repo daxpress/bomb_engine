@@ -149,7 +149,7 @@ impl HeaderParser {
     }
 
     fn parse_class(class: &Entity) -> Option<Class> {
-        // TODO Parse destructor,constructor methods and other special methods.
+        // TODO Parse destructor,constructor, copy and move ctor.
         if !Self::marked_as_exposed(class) {
             return None;
         }
@@ -171,7 +171,7 @@ impl HeaderParser {
                 class_info.methods.push(method);
             }
         }
-
+        // get members
         let members: Vec<Entity> = class
             .get_children()
             .into_iter()
@@ -200,7 +200,28 @@ impl HeaderParser {
                 class_info.members.push(member);
             }
         }
+        // get constructors
+        let constructors: Vec<Entity> = class
+            .get_children()
+            .into_iter()
+            .filter(|child| child.get_kind() == EntityKind::Constructor)
+            .collect();
 
+        for ctor in constructors.iter() {
+            if let Some(ctor) = Self::parse_ctor(ctor, class) {
+                class_info.constructors.push(ctor);
+            }
+        }
+        // get destructor
+        let dtor = class
+            .get_children()
+            .into_iter()
+            .find(|child| child.get_kind() == EntityKind::Destructor);
+        if let Some(dtor) = dtor {
+            if let Some(dtor) = Self::parse_method(&dtor) {
+                class_info.destructor = dtor;
+            }
+        }
         Some(class_info)
     }
 
@@ -332,7 +353,7 @@ impl HeaderParser {
             .unwrap_or(0)
             / 8;
 
-            member_info.brief = member.get_comment_brief().unwrap_or_default();
+        member_info.brief = member.get_comment_brief().unwrap_or_default();
 
         Some(member_info)
     }
@@ -342,6 +363,15 @@ impl HeaderParser {
         if let Some(mut member) = option {
             member.is_static = true;
             Some(member)
+        } else {
+            None
+        }
+    }
+
+    fn parse_ctor(ctor: &Entity, owner: &Entity) -> Option<Method> {
+        if let Some(mut ctor) = Self::parse_method(ctor) {
+            ctor.return_type = owner.get_type().unwrap().get_display_name();
+            Some(ctor)
         } else {
             None
         }
