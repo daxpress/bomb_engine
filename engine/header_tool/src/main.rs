@@ -9,7 +9,8 @@ fn main() -> Result<(), anyhow::Error> {
     }
     let args: Vec<String> = args.collect();
 
-    return header_tool::run(&args[1..]);
+    let modules = parse_arguments(&args[1..]);
+    return header_tool::run(modules);
 }
 
 #[derive(Debug, Clone)]
@@ -25,4 +26,30 @@ impl Error for ArgsError {
     fn description(&self) -> &str {
         "No headers were passed!"
     }
+}
+
+fn parse_arguments(args: &[String]) -> Vec<header_tool::Module> {
+    let mut modules = Vec::new();
+    let mut current_module= header_tool::Module::default();
+
+    for arg in args {
+        if arg.contains("--module=") {
+            if !current_module.is_empty() {
+                modules.push(current_module);
+            }
+            current_module = Default::default();
+            let splits: Vec<&str> = arg.split("=").collect();
+            if splits.len() != 2 {
+                panic!("Error in module passing format.");
+            }
+            current_module.module_name = splits[1].to_string();
+        }
+        else {
+            current_module.module_headers.push(arg.to_owned());
+        }
+    }
+    if !current_module.is_empty() {
+        modules.push(current_module);
+    }
+    modules
 }

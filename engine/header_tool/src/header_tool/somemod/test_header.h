@@ -4,6 +4,7 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 #include "included.h"
 
 namespace exposition
@@ -25,6 +26,7 @@ namespace exposition
         const int priv_int = -1;
         static bool is_static;
         std::string string;
+        std::vector<int> a_vector;
 
         int priv_met(char argument) { return 1; };
         static float static_method() { return .0f; };

@@ -45,11 +45,11 @@ impl HeaderParser {
     }
 
     /// Parses all the headers in a slice.
-    pub fn parse_header_collection(&self, headers: &[&str]) -> Vec<Namespace> {
+    pub fn parse_header_collection<'a>(&'a self, headers: &[(&str, &'a str)]) -> Vec<(Namespace, &str)> {
         let index = Index::new(&self.clang, false, false);
         headers
             .iter()
-            .map(|header| self.parse_header(&index, header))
+            .map(|header| (self.parse_header(&index, header.0), header.1))
             .collect()
     }
 
@@ -385,7 +385,7 @@ mod tests {
     #[test]
     fn parse_test() {
         let parser = HeaderParser::new();
-        let test_header = parser.parse_header_collection(&["src/header_tool/test_header.h"]);
+        let test_header = parser.parse_header_collection(&[("src/header_tool/somemod/test_header.h", "somemod")]);
         println!("{test_header:#?}")
     }
 }

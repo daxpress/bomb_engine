@@ -15,7 +15,7 @@ pub enum HeaderCacheOp {
     Add(String, String),
     Remove(String),
     Update(String, String),
-    Skip,
+    Skip(String),
 }
 
 impl HeaderCacheOp {
@@ -24,57 +24,87 @@ impl HeaderCacheOp {
             HeaderCacheOp::Add(header, _) => &header,
             HeaderCacheOp::Update(header, _) => &header,
             HeaderCacheOp::Remove(header) => &header,
-            HeaderCacheOp::Skip => "",
+            HeaderCacheOp::Skip(header) => &header,
         }
     }
 }
 
 /// Performs checks on the headers to know which operations to perform for each header.
 /// Loads a cache (if present) upon run_check() and writes the updated one when dropped.
-pub struct HeaderChecker {
+pub struct HeaderChecker<'a> {
     headers_cache: HashMap<String, String>,
-    operations: Vec<HeaderCacheOp>,
+    operations: Vec<(HeaderCacheOp, &'a str)>,
+    current_mod: &'a str,
 }
 
-impl HeaderChecker {
+impl<'a> HeaderChecker<'a> {
     pub fn new() -> Self {
+        let mut cache = HashMap::new();
+        match Self::read_cache() {
+            Result::Ok(loaded) => cache = loaded,
+            Err(_) => println!("No header cache found!"),
+        };
         HeaderChecker {
-            headers_cache: HashMap::new(),
+            headers_cache: cache,
             operations: Vec::new(),
+            current_mod: "",
         }
     }
 
-    pub fn run_check(&mut self, headers: &[String]) {
-        println!("Checking Headers...");
-        match self.read_cache() {
-            Result::Ok(cache) => self.headers_cache = cache,
-            Err(_) => println!("No header cache found!"),
-        };
-        let result = self.filter_headers(headers.to_vec());
-        //println!("Check result: {:#?}", result);
+    pub fn check(&mut self, headers: &[String], module: &'a str) {
+        println!("Checking Headers in {}...", module);
+        self.current_mod = module;
+        let result: Vec<(HeaderCacheOp, &str)> = self
+            .filter_headers(headers.to_vec())
+            .into_iter()
+            .map(|op| (op, module))
+            .collect();
         self.update_cache(&result);
-        self.operations = result
+        self.operations.extend(result)
     }
 
-    pub fn headers_to_generate(&self) -> Vec<&str> {
-        let filtered: Vec<&str> = self.operations.iter().filter(|op| match op {
-            HeaderCacheOp::Add(_, _) => true,
-            HeaderCacheOp::Update(_, _) => true,
-            _ => false
-        }).map(|op| op.get_header()).collect();
-        filtered
+    // call to tell the checker that the checks are over and to finalize the results.
+    pub fn close_checks(&mut self) {
+        // we don't know from which module the removed stuff comes from,
+        // so we put an empty &str. the remover won't read it anyway
+        let to_remove = self
+            .find_to_remove()
+            .into_iter()
+            .map(|op| (op, ""))
+            .collect();
+        self.update_cache(&to_remove);
+        self.operations.extend(to_remove);
+    }
+
+    pub fn headers_to_generate(&self) -> Vec<(&str, &str)> {
+        self
+            .operations
+            .iter()
+            .filter(|op| match &op.0 {
+                HeaderCacheOp::Add(_, _) => true,
+                HeaderCacheOp::Update(_, _) => true,
+                _ => false,
+            })
+            .map(|op| (op.0.get_header(), op.1))
+            .collect()
     }
 
     pub fn headers_to_delete(&self) -> Vec<&str> {
-        let filtered: Vec<&str> = self.operations.iter().filter(|op| match op {
-            HeaderCacheOp::Remove(_) => true,
-            _ => false
-        }).map(|op| op.get_header()).collect();
+        let filtered: Vec<&str> = self
+            .operations
+            .iter()
+            .filter(|op| match &op.0 {
+                HeaderCacheOp::Remove(_) => true,
+                _ => false,
+            })
+            .map(|op| op.0.get_header())
+            .collect();
         filtered
     }
 
     /// Reads the cache from disk and returns HashMap<header, content_hash>
-    fn read_cache(&self) -> Result<HashMap<String, String>, Error> {
+    fn read_cache() -> Result<HashMap<String, String>, Error> {
+        // TODO: cache also the module for each of them
         let file = File::open(Path::new(CACHE_NAME))?;
         println!("Reading cached file...");
         let lines = io::BufReader::new(file).lines();
@@ -93,23 +123,12 @@ impl HeaderChecker {
     /// the operations to perform to update the cache and generate information
     fn filter_headers(&self, headers: Vec<String>) -> Vec<HeaderCacheOp> {
         // first get the operation list from a copy of the headers vector (we still need headers after this operation)
-        let mut operation_list: Vec<HeaderCacheOp> = headers
+        headers
             .to_vec()
             .par_iter()
             .map(|header| self.get_headerop(header))
-            .filter(|op| *op != HeaderCacheOp::Skip)
-            .collect();
-        // because we could only get the Add and Update operations, now we check for Removals
-        // by comparing the cached headers with the passed headers instead;
-        let mut remove: Vec<HeaderCacheOp> = self
-            .headers_cache
-            .clone()
-            .into_par_iter()
-            .filter(|entry| !headers.contains(&entry.0))
-            .map(|elem| HeaderCacheOp::Remove(elem.0.to_string()))
-            .collect();
-        operation_list.append(&mut remove);
-        operation_list
+            //.filter(|op| *op != HeaderCacheOp::Skip)
+            .collect()
     }
 
     /// Returns a `HeaderCacheOp` for the passed header
@@ -127,15 +146,29 @@ impl HeaderChecker {
             if self.headers_cache[header] != hash {
                 HeaderCacheOp::Update(header.to_string(), hash)
             } else {
-                HeaderCacheOp::Skip
+                HeaderCacheOp::Skip(header.to_string())
             }
         } else {
             HeaderCacheOp::Add(header.to_string(), hash)
         }
     }
 
+    // called after all the checks are done to find the headers that have to be removed
+    fn find_to_remove(&self) -> Vec<HeaderCacheOp> {
+        // all the checked headers are in the self.operations member (except for the skipped ones)
+        // this means that we can use them to check if something was removed!
+        let headers: Vec<&str> = self.operations.iter().map(|op| op.0.get_header()).collect();
+        self.headers_cache
+            .clone()
+            .into_par_iter()
+            .filter(|entry| !headers.contains(&entry.0.as_str()))
+            .map(|elem| HeaderCacheOp::Remove(elem.0.to_string()))
+            .collect()
+    }
+
     /// writes the caceh back to disk
     fn write_cache(&self) {
+        // TODO: cache the module information
         let file = File::create(Path::new(CACHE_NAME)).unwrap();
         let mut writer = io::BufWriter::new(file);
         for (header, hash) in &self.headers_cache {
@@ -143,13 +176,13 @@ impl HeaderChecker {
         }
         writer.flush().unwrap()
     }
-    fn update_cache(&mut self, check_results: &Vec<HeaderCacheOp>) {
+    fn update_cache(&mut self, check_results: &Vec<(HeaderCacheOp, &str)>) {
         for result in check_results {
-            match result {
+            match &result.0 {
                 HeaderCacheOp::Remove(header) => {
                     self.headers_cache.remove(header);
                 }
-                HeaderCacheOp::Skip => (),
+                HeaderCacheOp::Skip(_) => (),
                 HeaderCacheOp::Add(header, hash) | HeaderCacheOp::Update(header, hash) => {
                     self.headers_cache
                         .insert(header.to_string(), hash.to_string());
@@ -159,8 +192,52 @@ impl HeaderChecker {
     }
 }
 
-impl Drop for HeaderChecker {
+impl Drop for HeaderChecker<'_> {
     fn drop(&mut self) {
         self.write_cache()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{fs, path::Path};
+
+    use super::{HeaderChecker, CACHE_NAME};
+
+    const TEST_FILE: &'static str = "src/header_tool/somemod/test_header.h";
+    // cache is generated in the root dir, use CACHE_NAME
+
+    // RUN SEPARATELY!!!
+    #[test]
+    fn check_no_operations() {
+        let mut checker = HeaderChecker::new();
+        let header = vec![TEST_FILE.to_string()];
+        checker.check(&header, "somemod");
+        checker.close_checks();
+
+        let generate = checker.headers_to_generate();
+        assert!(generate.is_empty());
+
+        let delete = checker.headers_to_delete();
+        assert!(delete.is_empty());
+    }
+    #[test]
+    fn check_generation_one() {
+        // remove the generated cache (it will be recreated next anyway)
+        if Path::new(CACHE_NAME).exists() {
+            fs::remove_file(CACHE_NAME).unwrap();
+        }
+        // now that wee don't have the cache we can expect to have the file to be generated.
+
+        let mut checker = HeaderChecker::new();
+        let header = vec![TEST_FILE.to_string()];
+        checker.check(&header, "somemod");
+        checker.close_checks();
+
+        let result = checker.headers_to_generate();
+        assert!(!result.is_empty());
+
+        let expected = vec![(TEST_FILE, "somemod")];
+        assert_eq!(expected, result);
     }
 }

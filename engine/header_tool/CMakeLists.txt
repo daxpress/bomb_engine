@@ -1,7 +1,7 @@
 # HEADER TOOL - RUST
-set(headers)
-set(libs)
-get_engine_headers(headers libs)
+
+set(ht_targets_)
+get_header_tool_targets(ht_targets_)
 
 set(generated_dir "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
@@ -12,7 +12,7 @@ set(generated_dir "${CMAKE_CURRENT_BINARY_DIR}/generated")
 # working directory is in binary dir, but target folder might exist from vscode development testing, so it is excluded from git just in case
 add_custom_target(header_tool
 	WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} 
-	COMMAND cargo run -r --quiet --target-dir ${CMAKE_CURRENT_BINARY_DIR} --manifest-path "${CMAKE_CURRENT_SOURCE_DIR}/Cargo.toml" -- ${headers}
+	COMMAND cargo run -r --quiet --target-dir ${CMAKE_CURRENT_BINARY_DIR} --manifest-path "${CMAKE_CURRENT_SOURCE_DIR}/Cargo.toml" -- ${ht_targets_}
 	BYPRODUCTS generated_dir
 )
 

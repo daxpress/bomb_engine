@@ -9,6 +9,7 @@ cmake_minimum_required (VERSION 3.28)
 #  set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
 #endif()
 
+# setup clang tidy
 set(CMAKE_CXX_CLANG_TIDY clang-tidy -checks=modernize-*,clang-analyzer-*,performance-*,portability-*,llvm-*,concurrency-*,)
 
 project (bomb_engine LANGUAGES CXX)
@@ -67,6 +68,8 @@ function(new_engine_module module_name library_type)
 	# set dependancy to header_tool to allow generated code to compile
 	add_dependencies(${module_name} header_tool)
 
+	set_property(GLOBAL APPEND PROPERTY header_tool_targets ${module_name})
+
 	# builds a precompiled header for each module so that we can have common stl stuff in the engine one
 	# and another one in the module that contains external libraries for the module
 	get_target_property(common_pch bomb_engine_engine SOURCE_DIR)
@@ -83,6 +86,26 @@ function(new_engine_module module_name library_type)
 	message(STATUS "skipped custom precompiled header for ${module_name}")
 	endif()
 
+endfunction()
+
+function(new_engine_plugin plugin_name library_type)
+	# it essentally does the same thing as the new_engine_module function, but it doesn't
+	# require to be added to the engine with add_engine_submodule as a plugin is, by definition, optional.
+	# It also does not declare a custom precompiled header by default.
+	message(STATUS "adding plugin: ${plugin_name}")
+
+	project(${plugin_name})
+
+	add_library(${plugin_name} ${library_type})
+	target_include_directories(${plugin_name} 
+		PUBLIC
+		${CMAKE_CURRENT_SOURCE_DIR}
+	)
+
+	# set dependancy to header_tool to allow generated code to compile
+	add_dependencies(${plugin_name} header_tool)
+
+	set_property(GLOBAL APPEND PROPERTY header_tool_targets ${plugin_name})
 endfunction()
 
 # copies files from a target src location to a dst target location
@@ -106,8 +129,25 @@ macro(get_engine_headers out_headers out_libs)
 		endforeach()
 endmacro()
 
+macro(get_header_tool_targets out_ht_args)
+	get_property(ht_targets GLOBAL PROPERTY header_tool_targets)
+	foreach(ht_target ${ht_targets})
+		get_target_property(__headers ${ht_target} HEADER_SET_HEADERS)
+		if(NOT __headers STREQUAL "__headers-NOTFOUND")
+			list(APPEND ${out_ht_args} "--module=${ht_target}")
+			list(APPEND ${out_ht_args} ${__headers})
+		endif()
+	endforeach()
+endmacro()
+
+# ====================================== GLOBAL VARIABLES =====================================
+
+set_property(GLOBAL PROPERTY header_tool_targets)
+
 # =================================== ENGINE SUBDIRECTORIES ===================================
 
 add_subdirectory(engine)
 add_subdirectory(editor)
 add_subdirectory(plugins)
+
+get_property(print_targets GLOBAL PROPERTY header_tool_targets)
