@@ -10,7 +10,8 @@ cmake_minimum_required (VERSION 3.28)
 #endif()
 
 # setup clang tidy
-set(CMAKE_CXX_CLANG_TIDY clang-tidy -checks=modernize-*,clang-analyzer-*,performance-*,portability-*,llvm-*,concurrency-*,)
+set(clang_tidy_checks "modernize-*,clang-analyzer-*,performance-*,portability-*,google-*,concurrency-*,")
+set(CMAKE_CXX_CLANG_TIDY clang-tidy -checks=${clang_tidy_checks})
 
 project (bomb_engine LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
@@ -129,6 +130,8 @@ macro(get_engine_headers out_headers out_libs)
 		endforeach()
 endmacro()
 
+# macro for the header_tool. prepares the input arguments for the tool using 
+# the custom property header_tool_targets (containing every engine module and plugin)
 macro(get_header_tool_targets out_ht_args)
 	get_property(ht_targets GLOBAL PROPERTY header_tool_targets)
 	foreach(ht_target ${ht_targets})
@@ -149,5 +152,3 @@ set_property(GLOBAL PROPERTY header_tool_targets)
 add_subdirectory(engine)
 add_subdirectory(editor)
 add_subdirectory(plugins)
-
-get_property(print_targets GLOBAL PROPERTY header_tool_targets)

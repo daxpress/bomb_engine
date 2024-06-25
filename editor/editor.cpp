@@ -1,5 +1,5 @@
 ﻿// editor.cpp : Defines the entry point for the application.
-//
+// right now it acts more like a sandbox to put everything together and test the functionalities.
 
 #include "graphics/window.h"
 #include "graphics/renderer.h"
@@ -21,6 +21,7 @@ int main()
 	bomb_engine::Window window{1920, 1080, "Bomb Engine Editor"};
 	auto renderer = bomb_engine::Renderer{ window, enable_layers };
 
+	// sample scene 
 	auto scene = bomb_engine::Scene();
 	auto entity1 = scene.spawn_entity();
 	entity1.add_component<bomb_engine::Scriptable>(bomb_engine::NativeScript());
@@ -33,6 +34,7 @@ int main()
 		// inside the loop we tick
 		window.poll_events();
 		scene.update(.6f);
+		renderer.draw_frame();
 	}
 
 	return 0;
