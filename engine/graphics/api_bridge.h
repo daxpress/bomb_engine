@@ -4,30 +4,31 @@
 
 namespace BE_NAMESPACE
 {
-	class IAPI;
+class IAPI;
 
-	enum class E_API : uint8_t
-	{
-		API_VULKAN = 0,
-		API_DIRECTX = 1,
-	};
+enum class E_API : uint8_t
+{
+    API_VULKAN = 0,
+    API_DIRECTX = 1,
+};
 
-	class APIBridge
-	{
-	public:
-		APIBridge() = default;
+class APIBridge
+{
+public:
+    APIBridge() = default;
 
-		[[nodiscard]]
-		bool initialize(Window& window, bool enable_validation_layers, E_API desired_api);
+    [[nodiscard]]
+    auto initialize(Window& window, bool enable_validation_layers, E_API desired_api) -> bool;
 
-		// a placeholder for testing while working on the vulkan renderer, later we'll fix responsabilities
-		void draw_frame();
+    // a placeholder for testing while working on the vulkan renderer, later we'll fix
+    // responsabilities
+    void draw_frame();
 
+    ~APIBridge();
 
-		~APIBridge();
-
-	private:
-		// not using unique_ptr because it doesn't allow forward declaration of interface (or at least I couldn't find a solution)
-		IAPI* m_current_api = nullptr;
-	};
-}
+private:
+    // not using unique_ptr because it doesn't allow forward declaration of interface (or at least I
+    // couldn't find a solution)
+    IAPI* m_current_api = nullptr;
+};
+}  // namespace BE_NAMESPACE

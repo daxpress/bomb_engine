@@ -13,7 +13,7 @@ const bool enable_layers = true;
 const bool enable_layers = false;
 #endif
 
-int main()
+auto main() -> int
 {
 	// the following will most definetly be part of an Application class in the future
 
@@ -38,4 +38,4 @@ int main()
 	}
 
 	return 0;
-}
+} 

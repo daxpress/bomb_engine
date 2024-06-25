@@ -6,3 +6,5 @@ BreakBeforeBraces: Allman
 Standard: Latest
 BinPackArguments: false
 BinPackParameters: false
+IndentAccessModifiers: false
+AccessModifierOffset: -4

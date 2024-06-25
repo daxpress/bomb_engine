@@ -9,17 +9,17 @@ namespace BE_NAMESPACE
 {
 class APIVulkan : public IAPI
 {
-   public:
+public:
     APIVulkan(Window& window, bool enable_validation_layers);
-    virtual ~APIVulkan() override;
+    ~APIVulkan() override;
 
-    inline virtual E_API get_api() { return E_API::API_VULKAN; }
+    inline auto get_api() -> E_API override { return E_API::API_VULKAN; }
 
     // testing only, I need a starting point to work from, which in this case is a model drawn to
     // the surface
-    virtual void draw_frame() override;
+    void draw_frame() override;
 
-   private:
+private:
     const std::vector<const char*> m_validation_layers{"VK_LAYER_KHRONOS_validation"};
 
     const std::vector<const char*> m_required_device_extensions{VK_KHR_SWAPCHAIN_EXTENSION_NAME};
@@ -55,7 +55,7 @@ class APIVulkan : public IAPI
     vk::DescriptorSetLayout m_example_descriptor_set_layout;
     vk::CommandPool m_example_command_pool;
 
-   private:
+private:
     void create_instance(const Window& window, bool enable_validation_layers);
     /// <summary>
     /// Use this to setup a debug callback
@@ -66,32 +66,37 @@ class APIVulkan : public IAPI
 
     void create_surface(const Window& window, VkSurfaceKHR& surface);
 
-    vk::PhysicalDevice select_physical_device();
+    auto select_physical_device() -> vk::PhysicalDevice;
     /// <summary>
     /// Rates a physical device to pick the best one from the available ones.
     /// </summary>
     /// <param name="physical_device:"> the physical device to rate</param>
     /// <returns> the overall score based on the features and properties</returns>
-    uint32_t rate_physical_device(vk::PhysicalDevice physical_device);
-    bool physical_device_is_suitable(vk::PhysicalDevice physical_device);
-    VkQueueFamilyIndices get_queue_families(vk::PhysicalDevice physical_device);
-    bool check_extensions_support(vk::PhysicalDevice physical_device);
+    auto rate_physical_device(vk::PhysicalDevice physical_device) -> uint32_t;
+    auto physical_device_is_suitable(vk::PhysicalDevice physical_device) -> bool;
+    auto get_queue_families(vk::PhysicalDevice physical_device) -> VkQueueFamilyIndices;
+    auto check_extensions_support(vk::PhysicalDevice physical_device) -> bool;
 
-    vk::Device create_logical_device(vk::PhysicalDevice physical_device);
+    auto create_logical_device(vk::PhysicalDevice physical_device) -> vk::Device;
 
-    VkSwapchainInfo create_swapchain(
+    auto create_swapchain(
         vk::PhysicalDevice physical_device,
         vk::SurfaceKHR surface,
         vk::Device device,
         vk::SwapchainKHR old_swapchain = nullptr
-    );
-    vk::SurfaceFormatKHR choose_swapchain_surface_format(std::vector<vk::SurfaceFormatKHR> formats);
-    vk::PresentModeKHR choose_swapchain_present_mode(std::vector<vk::PresentModeKHR> present_modes);
-    vk::Extent2D choose_swapchain_extent(vk::SurfaceCapabilitiesKHR capabilities);
+    ) -> VkSwapchainInfo;
 
-    vk::ShaderModule create_shader_module(SPIRVShader& shader);
+    auto choose_swapchain_surface_format(std::vector<vk::SurfaceFormatKHR> formats
+    ) -> vk::SurfaceFormatKHR;
 
-    std::pair<vk::Image, vk::DeviceMemory> create_image(
+    auto choose_swapchain_present_mode(const std::vector<vk::PresentModeKHR>& present_modes
+    ) -> vk::PresentModeKHR;
+
+    auto choose_swapchain_extent(vk::SurfaceCapabilitiesKHR capabilities) -> vk::Extent2D;
+
+    auto create_shader_module(SPIRVShader& shader) -> vk::ShaderModule;
+
+    auto create_image(
         uint32_t width,
         uint32_t height,
         uint32_t mips,
@@ -100,8 +105,9 @@ class APIVulkan : public IAPI
         vk::ImageTiling tiling,
         vk::ImageUsageFlags usage,
         vk::MemoryPropertyFlags
-    );
-    uint32_t find_memory_type(uint32_t type_bits, vk::MemoryPropertyFlags props);
+    ) -> std::pair<vk::Image, vk::DeviceMemory>;
+
+    auto find_memory_type(uint32_t type_bits, vk::MemoryPropertyFlags props) -> uint32_t;
     void transition_image_layout(
         vk::Image image,
         vk::Format format,
@@ -112,30 +118,30 @@ class APIVulkan : public IAPI
 
     // these are required to get ourselves to draw something in the editor in order to have easier
     // refactoring and feature introduction
-    vk::Pipeline create_example_pipeline();
-    vk::RenderPass create_example_render_pass();
-    vk::PipelineLayout create_example_pipeline_layout();
+    auto create_example_pipeline() -> vk::Pipeline;
+    auto create_example_render_pass() -> vk::RenderPass;
+    auto create_example_pipeline_layout() -> vk::PipelineLayout;
 
     void create_color_resources(
-        VkSwapchainInfo swapchain,
+        const VkSwapchainInfo& swapchain,
         vk::Image& out_image,
         vk::ImageView& out_img_view,
         vk::DeviceMemory& out_memory
     );
     void create_depth_resources(
-        VkSwapchainInfo swapchain,
+        const VkSwapchainInfo& swapchain,
         vk::Image& out_image,
         vk::ImageView& out_img_view,
         vk::DeviceMemory& out_memory
     );
-    std::vector<vk::Framebuffer> create_frame_buffers(
-        VkSwapchainInfo swapchain, vk::RenderPass render_pass
-    );
+    auto create_frame_buffers(VkSwapchainInfo swapchain, vk::RenderPass render_pass)
+        -> std::vector<vk::Framebuffer>;
 
-    vk::CommandPool create_command_pool(vk::CommandPoolCreateFlags flags, uint32_t queue_family);
-    std::vector<vk::CommandBuffer> create_command_buffers(
-        vk::CommandPool pool, vk::CommandBufferLevel level, uint32_t count
-    );
+    auto create_command_pool(vk::CommandPoolCreateFlags flags, uint32_t queue_family)
+        -> vk::CommandPool;
+
+    auto create_command_buffers(vk::CommandPool pool, vk::CommandBufferLevel level, uint32_t count)
+        -> std::vector<vk::CommandBuffer>;
     void record_example_command_buffer(vk::CommandBuffer buffer, uint32_t image_index);
 };
 }  // namespace BE_NAMESPACE

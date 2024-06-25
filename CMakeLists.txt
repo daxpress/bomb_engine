@@ -10,13 +10,14 @@ cmake_minimum_required (VERSION 3.28)
 #endif()
 
 # setup clang tidy
-set(clang_tidy_checks "modernize-*,clang-analyzer-*,performance-*,portability-*,google-*,concurrency-*,")
-set(CMAKE_CXX_CLANG_TIDY clang-tidy -checks=${clang_tidy_checks})
+set(clang_tidy_checks "modernize-*,clang-analyzer-*,performance-*,portability-*,google-*,concurrency-*,-google-readability-todo")
+set(CMAKE_CXX_CLANG_TIDY clang-tidy -checks=${clang_tidy_checks} -header-filter=.*)
 
 project (bomb_engine LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED On)
 set(CMAKE_CXX_SCAN_FOR_MODULES Off)
+set(CMAKE_EXPORT_COMPILE_COMMANDS On)
 
 
 include(ProcessorCount)

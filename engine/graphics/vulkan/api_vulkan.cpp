@@ -8,7 +8,7 @@
 
 #pragma region vulkan instance helpers
 
-bool validation_layers_supported(std::vector<const char*> validation_layers)
+auto validation_layers_supported(const std::vector<const char*>& validation_layers) -> bool
 {
     // same tricks used with the other check above
     uint32_t layer_count;
@@ -43,7 +43,7 @@ bool validation_layers_supported(std::vector<const char*> validation_layers)
     return true;
 }
 
-bool extensions_supported(const char** required_extensions, uint32_t count)
+auto extensions_supported(const char** required_extensions, uint32_t count) -> bool
 {
     uint32_t extensions_count = 0;
     if (vk::enumerateInstanceExtensionProperties(nullptr, &extensions_count, nullptr) !=
@@ -77,7 +77,7 @@ bool extensions_supported(const char** required_extensions, uint32_t count)
     return true;
 }
 
-std::vector<const char*> get_required_instance_extensions(bool enable_validation_layers)
+auto get_required_instance_extensions(bool enable_validation_layers) -> std::vector<const char*>
 {
     uint32_t extension_count = 0;
     const char** glfw_extensions = glfwGetRequiredInstanceExtensions(&extension_count);
@@ -94,14 +94,14 @@ std::vector<const char*> get_required_instance_extensions(bool enable_validation
 
 // The debug callback for the validation layers: it has to be either a function
 // or a static method (no context)
-VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
+VKAPI_ATTR auto VKAPI_CALL debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
     VkDebugUtilsMessageTypeFlagsEXT messageType,
     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
     void* pUserData
-)
+) -> VkBool32
 {
-    std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
+    std::cerr << "validation layer: " << pCallbackData->pMessage << "\n";
     return VK_FALSE;
 }
 
@@ -189,9 +189,9 @@ void APIVulkan::create_instance(const Window& window, bool enable_validation_lay
 {
     vk::ApplicationInfo appInfo(
         window.get_title().c_str(),
-        vk::makeVersion(0, 1, 0),
+        VK_MAKE_API_VERSION(0, 0, 1, 0),
         "Bomb Engine",
-        vk::makeVersion(0, 1, 0),
+        VK_MAKE_API_VERSION(0, 0, 1, 0),
         vk::ApiVersion13,
         nullptr
     );
@@ -265,7 +265,7 @@ void APIVulkan::create_surface(const Window& window, VkSurfaceKHR& surface)
     }
 }
 
-vk::PhysicalDevice APIVulkan::select_physical_device()
+auto APIVulkan::select_physical_device() -> vk::PhysicalDevice
 {
     auto physical_devices = m_vulkan_instance->enumeratePhysicalDevices();
     if (physical_devices.empty())
@@ -273,7 +273,7 @@ vk::PhysicalDevice APIVulkan::select_physical_device()
         throw std::runtime_error("failed to find a supported GPU!");
     }
 
-    std::map<uint32_t, vk::PhysicalDevice, std::greater<uint32_t>> device_ratings;
+    std::map<uint32_t, vk::PhysicalDevice, std::greater<>> device_ratings;
 
     for (const auto& p_device : physical_devices)
     {
@@ -291,12 +291,12 @@ vk::PhysicalDevice APIVulkan::select_physical_device()
 
     // TODO: use logging macro instead
     std::cout << "Picked Device: " << device_ratings.begin()->second.getProperties().deviceName
-              << std::endl;
+              << "\n";
 
     return device_ratings.begin()->second;
 }
 
-bool APIVulkan::physical_device_is_suitable(vk::PhysicalDevice physical_device)
+auto APIVulkan::physical_device_is_suitable(vk::PhysicalDevice physical_device) -> bool
 {
     auto families = get_queue_families(physical_device);
     if (!families.is_complete())
@@ -318,13 +318,13 @@ bool APIVulkan::physical_device_is_suitable(vk::PhysicalDevice physical_device)
     return true;
 }
 
-uint32_t APIVulkan::rate_physical_device(vk::PhysicalDevice physical_device)
+auto APIVulkan::rate_physical_device(vk::PhysicalDevice physical_device) -> uint32_t
 {
     uint32_t score = 0;
 
     auto properties = physical_device.getProperties();
     auto memory_properties = physical_device.getMemoryProperties();
-    auto features = physical_device.getFeatures();
+    // auto features = physical_device.getFeatures();
 
     if (properties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
     {
@@ -347,7 +347,7 @@ uint32_t APIVulkan::rate_physical_device(vk::PhysicalDevice physical_device)
     return score;
 }
 
-VkQueueFamilyIndices APIVulkan::get_queue_families(vk::PhysicalDevice physical_device)
+auto APIVulkan::get_queue_families(vk::PhysicalDevice physical_device) -> VkQueueFamilyIndices
 {
     VkQueueFamilyIndices families{};
 
@@ -387,7 +387,7 @@ VkQueueFamilyIndices APIVulkan::get_queue_families(vk::PhysicalDevice physical_d
     return families;
 }
 
-bool APIVulkan::check_extensions_support(vk::PhysicalDevice physical_device)
+auto APIVulkan::check_extensions_support(vk::PhysicalDevice physical_device) -> bool
 {
     auto available_extensions = physical_device.enumerateDeviceExtensionProperties();
 
@@ -403,7 +403,7 @@ bool APIVulkan::check_extensions_support(vk::PhysicalDevice physical_device)
     return required_extensions.empty();
 }
 
-vk::Device APIVulkan::create_logical_device(vk::PhysicalDevice physical_device)
+auto APIVulkan::create_logical_device(vk::PhysicalDevice physical_device) -> vk::Device
 {
     auto families = get_queue_families(physical_device);
 
@@ -450,12 +450,12 @@ vk::Device APIVulkan::create_logical_device(vk::PhysicalDevice physical_device)
     return physical_device.createDevice(create_info);
 }
 
-VkSwapchainInfo APIVulkan::create_swapchain(
+auto APIVulkan::create_swapchain(
     vk::PhysicalDevice physical_device,
     vk::SurfaceKHR surface,
     vk::Device device,
     vk::SwapchainKHR old_swapchain
-)
+) -> VkSwapchainInfo
 {
     auto swapchain_details = VkSwapchainDetails(physical_device, surface);
     auto [format, color_space] = choose_swapchain_surface_format(swapchain_details.formats);
@@ -525,9 +525,8 @@ VkSwapchainInfo APIVulkan::create_swapchain(
     return swapchain_info;
 }
 
-vk::SurfaceFormatKHR APIVulkan::choose_swapchain_surface_format(
-    std::vector<vk::SurfaceFormatKHR> formats
-)
+auto APIVulkan::choose_swapchain_surface_format(std::vector<vk::SurfaceFormatKHR> formats
+) -> vk::SurfaceFormatKHR
 {
     for (const auto& format : formats)
     {
@@ -540,9 +539,8 @@ vk::SurfaceFormatKHR APIVulkan::choose_swapchain_surface_format(
     return formats[0];
 }
 
-vk::PresentModeKHR APIVulkan::choose_swapchain_present_mode(
-    std::vector<vk::PresentModeKHR> present_modes
-)
+auto APIVulkan::choose_swapchain_present_mode(const std::vector<vk::PresentModeKHR>& present_modes
+) -> vk::PresentModeKHR
 {
     for (const auto& present_mode : present_modes)
     {
@@ -556,7 +554,7 @@ vk::PresentModeKHR APIVulkan::choose_swapchain_present_mode(
     return vk::PresentModeKHR::eFifo;
 }
 
-vk::Extent2D APIVulkan::choose_swapchain_extent(vk::SurfaceCapabilitiesKHR capabilities)
+auto APIVulkan::choose_swapchain_extent(vk::SurfaceCapabilitiesKHR capabilities) -> vk::Extent2D
 {
     if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
     {
@@ -571,7 +569,7 @@ vk::Extent2D APIVulkan::choose_swapchain_extent(vk::SurfaceCapabilitiesKHR capab
     return std::clamp(extent, capabilities.minImageExtent, capabilities.maxImageExtent);
 }
 
-vk::ShaderModule APIVulkan::create_shader_module(SPIRVShader& shader)
+auto APIVulkan::create_shader_module(SPIRVShader& shader) -> vk::ShaderModule
 {
     vk::ShaderModuleCreateInfo create_info(
         vk::ShaderModuleCreateFlagBits(), shader.get_bytes_count(), shader.get_data().data()
@@ -579,7 +577,7 @@ vk::ShaderModule APIVulkan::create_shader_module(SPIRVShader& shader)
     return m_device.createShaderModule(create_info);
 }
 
-std::pair<vk::Image, vk::DeviceMemory> APIVulkan::create_image(
+auto APIVulkan::create_image(
     uint32_t width,
     uint32_t height,
     uint32_t mips,
@@ -588,7 +586,7 @@ std::pair<vk::Image, vk::DeviceMemory> APIVulkan::create_image(
     vk::ImageTiling tiling,
     vk::ImageUsageFlags usage,
     vk::MemoryPropertyFlags props
-)
+) -> std::pair<vk::Image, vk::DeviceMemory>
 {
     auto indices = get_queue_families(m_physical_device);
     auto sharing_mode = vk::SharingMode::eExclusive;
@@ -623,10 +621,10 @@ std::pair<vk::Image, vk::DeviceMemory> APIVulkan::create_image(
 
     m_device.bindImageMemory(image, memory, 0);
 
-    return std::pair<vk::Image, vk::DeviceMemory>(image, memory);
+    return {image, memory};
 }
 
-uint32_t APIVulkan::find_memory_type(uint32_t type_bits, vk::MemoryPropertyFlags props)
+auto APIVulkan::find_memory_type(uint32_t type_bits, vk::MemoryPropertyFlags props) -> uint32_t
 {
     auto pd_props = m_physical_device.getMemoryProperties();
 
@@ -651,7 +649,7 @@ void APIVulkan::transition_image_layout(
 {
 }
 
-vk::Pipeline APIVulkan::create_example_pipeline()
+auto APIVulkan::create_example_pipeline() -> vk::Pipeline
 {
     SPIRVShader vertex, fragment;
     if (auto vertex_file = file_helper::load_file("shaders/vertex.spv"); vertex_file.has_value())
@@ -775,7 +773,7 @@ vk::Pipeline APIVulkan::create_example_pipeline()
 
     return pipeline_res.value;
 }
-vk::RenderPass APIVulkan::create_example_render_pass()
+auto APIVulkan::create_example_render_pass() -> vk::RenderPass
 {
     vk::AttachmentDescription color_attachment(
         vk::AttachmentDescriptionFlagBits(),
@@ -844,7 +842,7 @@ vk::RenderPass APIVulkan::create_example_render_pass()
 
     return m_device.createRenderPass(render_pass_info);
 }
-vk::PipelineLayout APIVulkan::create_example_pipeline_layout()
+auto APIVulkan::create_example_pipeline_layout() -> vk::PipelineLayout
 {
     vk::DescriptorSetLayoutBinding projection(
         0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex
@@ -868,7 +866,7 @@ vk::PipelineLayout APIVulkan::create_example_pipeline_layout()
 }
 
 void APIVulkan::create_color_resources(
-    VkSwapchainInfo swapchain,
+    const VkSwapchainInfo& swapchain,
     vk::Image& out_image,
     vk::ImageView& out_img_view,
     vk::DeviceMemory& out_memory
@@ -899,7 +897,7 @@ void APIVulkan::create_color_resources(
 }
 
 void APIVulkan::create_depth_resources(
-    VkSwapchainInfo swapchain,
+    const VkSwapchainInfo& swapchain,
     vk::Image& out_image,
     vk::ImageView& out_img_view,
     vk::DeviceMemory& out_memory
@@ -929,9 +927,8 @@ void APIVulkan::create_depth_resources(
     });
 }
 
-std::vector<vk::Framebuffer> APIVulkan::create_frame_buffers(
-    VkSwapchainInfo swapchain, vk::RenderPass render_pass
-)
+auto APIVulkan::create_frame_buffers(VkSwapchainInfo swapchain, vk::RenderPass render_pass)
+    -> std::vector<vk::Framebuffer>
 {
     std::vector<vk::Framebuffer> frame_buffers(swapchain.images.size());
 
@@ -956,18 +953,18 @@ std::vector<vk::Framebuffer> APIVulkan::create_frame_buffers(
     return frame_buffers;
 }
 
-vk::CommandPool APIVulkan::create_command_pool(
-    vk::CommandPoolCreateFlags flags, uint32_t queue_family
-)
+auto APIVulkan::create_command_pool(vk::CommandPoolCreateFlags flags, uint32_t queue_family)
+    -> vk::CommandPool
 {
     return m_device.createCommandPool(vk::CommandPoolCreateInfo(flags, queue_family));
 }
-std::vector<vk::CommandBuffer> APIVulkan::create_command_buffers(
+auto APIVulkan::create_command_buffers(
     vk::CommandPool pool, vk::CommandBufferLevel level, uint32_t count
-)
+) -> std::vector<vk::CommandBuffer>
 {
     return m_device.allocateCommandBuffers(vk::CommandBufferAllocateInfo(pool, level, count));
 }
+
 void APIVulkan::record_example_command_buffer(vk::CommandBuffer buffer, uint32_t image_index)
 {
     buffer.begin(vk::CommandBufferBeginInfo());

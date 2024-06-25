@@ -4,13 +4,13 @@
 
 namespace BE_NAMESPACE
 {
-	class IAPI
-	{
-	public:
-		virtual ~IAPI() {};
-		
-		inline virtual E_API get_api() = 0;
+class IAPI
+{
+public:
+    virtual ~IAPI() = default;
 
-		virtual void draw_frame() {};
-	};
-}
+    inline virtual auto get_api() -> E_API = 0;
+
+    virtual void draw_frame() {};
+};
+}  // namespace BE_NAMESPACE

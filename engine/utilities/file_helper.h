@@ -2,12 +2,13 @@
 
 namespace BE_NAMESPACE::file_helper
 {
-	enum class file_error
-	{
-		file_not_found = 0,
-		invalid_filesize,
-		read_error,
-	};
+enum class file_error : uint8_t
+{
+    file_not_found = 0,
+    invalid_filesize,
+    read_error,
+};
 
-	std::expected<std::vector<char>, file_error> load_file(const std::filesystem::path& filepath);
-}
+auto load_file(const std::filesystem::path& filepath
+) -> std::expected<std::vector<char>, file_error>;
+}  // namespace BE_NAMESPACE::file_helper
