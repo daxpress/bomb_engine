@@ -25,7 +25,8 @@ private:
     const std::vector<const char*> m_required_device_extensions{VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
     const vk::Format DEPTH_FORMAT = vk::Format::eD32SfloatS8Uint;
-    const vk::ClearValue clear_value = vk::ClearValue({0.0f, 0.0f, 0.0f, 1.0f});
+    const vk::ClearValue CLEAR_VALUE = vk::ClearValue({0.0f, 0.0f, 0.0f, 1.0f});
+    const int MAX_FRAMES_IN_FLIGHT = 2;
 
     bool b_use_validation_layers = false;
     Window& m_window_ref;
@@ -39,6 +40,7 @@ private:
     vk::Queue m_compute_queue;
     VkSwapchainInfo m_swapchain_info;
     std::vector<vk::Framebuffer> m_frame_buffers;
+    uint32_t current_frame = 0;
 
     // for pipeline
     vk::Image m_color_image;
@@ -48,12 +50,18 @@ private:
     vk::ImageView m_depth_image_view;
     vk::DeviceMemory m_depth_image_memory;
 
+    std::vector<vk::Semaphore> m_swapchain_image_available;
+    std::vector<vk::Semaphore> m_render_finished;
+    std::vector<vk::Fence> m_in_flight;
+    bool frame_resized = false;
+
     // example pipeline
     vk::Pipeline m_example_pipeline;
     vk::PipelineLayout m_example_layout;
     vk::RenderPass m_example_renderpass;
     vk::DescriptorSetLayout m_example_descriptor_set_layout;
     vk::CommandPool m_example_command_pool;
+    std::vector<vk::CommandBuffer> m_example_command_buffers;
 
 private:
     void create_instance(const Window& window, bool enable_validation_layers);
@@ -85,6 +93,16 @@ private:
         vk::Device device,
         vk::SwapchainKHR old_swapchain = nullptr
     ) -> VkSwapchainInfo;
+
+    void cleanup_swapchain(VkSwapchainInfo& swapchain);
+
+    auto recreate_swapchain_and_framebuffers(
+        vk::PhysicalDevice physical_device,
+        vk::SurfaceKHR surface,
+        vk::Device device,
+        vk::SwapchainKHR old_swapchain,
+        vk::RenderPass render_pass
+    ) -> std::tuple<VkSwapchainInfo, std::vector<vk::Framebuffer>>;
 
     auto choose_swapchain_surface_format(std::vector<vk::SurfaceFormatKHR> formats
     ) -> vk::SurfaceFormatKHR;
@@ -142,6 +160,12 @@ private:
 
     auto create_command_buffers(vk::CommandPool pool, vk::CommandBufferLevel level, uint32_t count)
         -> std::vector<vk::CommandBuffer>;
+
+    auto create_command_buffer(vk::CommandPool pool, vk::CommandBufferLevel level)
+        -> vk::CommandBuffer;
+
     void record_example_command_buffer(vk::CommandBuffer buffer, uint32_t image_index);
+
+    void create_sync_objects();
 };
 }  // namespace BE_NAMESPACE

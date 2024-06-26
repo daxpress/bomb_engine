@@ -2,6 +2,8 @@
 // 
 //  add here STL stuff 
 
+#pragma once
+
 //structures
 #include <vector>
 #include <map>
@@ -14,6 +16,7 @@
 #include <string>
 #include <memory>
 #include <cstdint>
+#include <stdfloat>
 #include <cinttypes>
 #include <algorithm>
 #include <iostream>
@@ -23,6 +26,7 @@
 #include <functional>
 #include <expected>
 #include <filesystem>
+#include <ranges>
 
 // macros
 

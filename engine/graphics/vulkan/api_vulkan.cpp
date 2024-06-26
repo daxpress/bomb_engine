@@ -151,29 +151,35 @@ APIVulkan::APIVulkan(Window& window, bool enable_validation_layers)
     m_example_command_pool = create_command_pool(
         vk::CommandPoolCreateFlagBits::eResetCommandBuffer, families.graphics.value()
     );
+    m_example_command_buffers = create_command_buffers(
+        m_example_command_pool, vk::CommandBufferLevel::ePrimary, MAX_FRAMES_IN_FLIGHT
+    );
+
+    create_sync_objects();
 }
 
 APIVulkan::~APIVulkan()
 {
+    m_device.waitIdle();
+
+    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        m_device.destroySemaphore(m_render_finished[i]);
+        m_device.destroySemaphore(m_swapchain_image_available[i]);
+        m_device.destroyFence(m_in_flight[i]);
+    }
+
+    m_device.freeCommandBuffers(m_example_command_pool, m_example_command_buffers);
     m_device.destroyCommandPool(m_example_command_pool);
 
-    // swapchain
     m_device.destroyImageView(m_color_image_view);
     m_device.destroyImageView(m_depth_image_view);
     m_device.destroyImage(m_color_image);
     m_device.destroyImage(m_depth_image);
     m_device.freeMemory(m_color_image_memory);
     m_device.freeMemory(m_depth_image_memory);
-    for (const auto& framebuffer : m_frame_buffers)
-    {
-        m_device.destroyFramebuffer(framebuffer);
-    }
-    for (const auto& image_view : m_swapchain_info.image_views)
-    {
-        m_device.destroyImageView(image_view);
-    }
-    m_device.destroySwapchainKHR(m_swapchain_info.swapchain);
-    // end swpachain
+
+    cleanup_swapchain(m_swapchain_info);
 
     m_device.destroyPipeline(m_example_pipeline);
     m_device.destroyRenderPass(m_example_renderpass);
@@ -183,7 +189,69 @@ APIVulkan::~APIVulkan()
     vkDestroySurfaceKHR(*m_vulkan_instance, m_surface, nullptr);
 }
 
-void APIVulkan::draw_frame() {}
+void APIVulkan::draw_frame()
+{
+    auto result = m_device.waitForFences(
+        m_in_flight[current_frame], true, std::numeric_limits<uint64_t>().max()
+    );
+
+    auto [image_index_result, image_index] = m_device.acquireNextImageKHR(
+        m_swapchain_info.swapchain,
+        std::numeric_limits<uint64_t>().max(),
+        m_swapchain_image_available[current_frame],
+        nullptr
+    );
+
+    if (image_index_result == vk::Result::eErrorOutOfDateKHR)
+    {
+        auto [swapchain, framebuffers] = recreate_swapchain_and_framebuffers(
+            m_physical_device, m_surface, m_device, nullptr, m_example_renderpass
+        );
+        m_swapchain_info = swapchain;
+        m_frame_buffers = framebuffers;
+        return;
+    }
+    else if (image_index_result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR)
+    {
+        throw std::runtime_error("failed to acquire swap chain image!");
+    }
+    m_device.resetFences(m_in_flight[current_frame]);
+
+    m_example_command_buffers[current_frame].reset();
+
+    record_example_command_buffer(m_example_command_buffers[current_frame], image_index);
+
+    const std::array<vk::PipelineStageFlags, 1> wait_stages = {
+        vk::PipelineStageFlagBits::eColorAttachmentOutput
+    };
+
+    m_graphics_queue.submit(
+        vk::SubmitInfo(
+            m_swapchain_image_available[current_frame],
+            wait_stages,
+            m_example_command_buffers[current_frame],
+            m_render_finished[current_frame]
+        ),
+        m_in_flight[current_frame]
+    );
+
+    try
+    {
+        auto present_result = m_present_queue.presentKHR(vk::PresentInfoKHR(
+            m_render_finished[current_frame], m_swapchain_info.swapchain, image_index
+        ));
+    }
+    catch (const vk::OutOfDateKHRError&) // handle resize
+    {
+        auto [swapchain, framebuffers] = recreate_swapchain_and_framebuffers(
+            m_physical_device, m_surface, m_device, nullptr, m_example_renderpass
+        );
+        m_swapchain_info = swapchain;
+        m_frame_buffers = framebuffers;
+    }
+
+    current_frame = current_frame++ % MAX_FRAMES_IN_FLIGHT;
+}
 
 void APIVulkan::create_instance(const Window& window, bool enable_validation_layers)
 {
@@ -366,8 +434,7 @@ auto APIVulkan::get_queue_families(vk::PhysicalDevice physical_device) -> VkQueu
         }
 
         if (!(queue_family.queueFlags & vk::QueueFlagBits::eGraphics) &&
-            (queue_family.queueFlags & vk::QueueFlagBits::eTransfer
-            ) /* == vk::QueueFlagBits::eTransfer*/)
+            queue_family.queueFlags & vk::QueueFlagBits::eTransfer)
         {
             families.transfer = family_index;
         }
@@ -382,6 +449,8 @@ auto APIVulkan::get_queue_families(vk::PhysicalDevice physical_device) -> VkQueu
         {
             break;
         }
+
+        family_index++;
     }
 
     return families;
@@ -958,6 +1027,7 @@ auto APIVulkan::create_command_pool(vk::CommandPoolCreateFlags flags, uint32_t q
 {
     return m_device.createCommandPool(vk::CommandPoolCreateInfo(flags, queue_family));
 }
+
 auto APIVulkan::create_command_buffers(
     vk::CommandPool pool, vk::CommandBufferLevel level, uint32_t count
 ) -> std::vector<vk::CommandBuffer>
@@ -965,17 +1035,82 @@ auto APIVulkan::create_command_buffers(
     return m_device.allocateCommandBuffers(vk::CommandBufferAllocateInfo(pool, level, count));
 }
 
+auto APIVulkan::create_command_buffer(vk::CommandPool pool, vk::CommandBufferLevel level)
+    -> vk::CommandBuffer
+{
+    return create_command_buffers(pool, level, 1)[0];
+}
+
 void APIVulkan::record_example_command_buffer(vk::CommandBuffer buffer, uint32_t image_index)
 {
     buffer.begin(vk::CommandBufferBeginInfo());
+
     buffer.beginRenderPass(
         vk::RenderPassBeginInfo(
             m_example_renderpass,
             m_frame_buffers[image_index],
             vk::Rect2D({0, 0}, m_swapchain_info.extent),
-            clear_value
+            CLEAR_VALUE
         ),
         vk::SubpassContents::eInline
     );
+
+    buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, m_example_pipeline);
+
+    auto viewport = vk::Viewport(
+        0.0f, 0.0f, m_swapchain_info.extent.width, m_swapchain_info.extent.height, 0.0f, 1.0f
+    );
+    buffer.setViewport(0, viewport);
+
+    auto scissor = vk::Rect2D({0, 0}, m_swapchain_info.extent);
+    buffer.setScissor(0, scissor);
+
+    buffer.draw(3, 1, 0, 0);
+
+    buffer.endRenderPass();
+
+    buffer.end();
+}
+
+void APIVulkan::create_sync_objects()
+{
+    m_swapchain_image_available.resize(MAX_FRAMES_IN_FLIGHT);
+    m_render_finished.resize(MAX_FRAMES_IN_FLIGHT);
+    m_in_flight.resize(MAX_FRAMES_IN_FLIGHT);
+
+    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        m_swapchain_image_available[i] = m_device.createSemaphore(vk::SemaphoreCreateInfo());
+        m_render_finished[i] = m_device.createSemaphore(vk::SemaphoreCreateInfo());
+        m_in_flight[i] =
+            m_device.createFence(vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
+    }
+}
+void APIVulkan::cleanup_swapchain(VkSwapchainInfo& swapchain)
+{
+    for (const auto& framebuffer : m_frame_buffers)
+    {
+        m_device.destroyFramebuffer(framebuffer);
+    }
+    for (const auto& image_view : m_swapchain_info.image_views)
+    {
+        m_device.destroyImageView(image_view);
+    }
+    m_device.destroySwapchainKHR(m_swapchain_info.swapchain);
+}
+
+auto APIVulkan::recreate_swapchain_and_framebuffers(
+    vk::PhysicalDevice physical_device,
+    vk::SurfaceKHR surface,
+    vk::Device device,
+    vk::SwapchainKHR old_swapchain,
+    vk::RenderPass render_pass
+) -> std::tuple<VkSwapchainInfo, std::vector<vk::Framebuffer>>
+{
+    m_device.waitIdle();
+    cleanup_swapchain(m_swapchain_info);
+    auto swapchain_info = create_swapchain(physical_device, surface, device, old_swapchain);
+    auto frame_buffers = create_frame_buffers(swapchain_info, render_pass);
+    return {swapchain_info, frame_buffers};
 }
 }  // namespace BE_NAMESPACE
