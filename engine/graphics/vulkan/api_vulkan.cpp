@@ -155,7 +155,9 @@ APIVulkan::APIVulkan(Window& window, bool enable_validation_layers)
         m_example_command_pool, vk::CommandBufferLevel::ePrimary, MAX_FRAMES_IN_FLIGHT
     );
 
-    create_sync_objects();
+    
+
+        create_sync_objects();
 }
 
 APIVulkan::~APIVulkan()
@@ -204,11 +206,9 @@ void APIVulkan::draw_frame()
 
     if (image_index_result == vk::Result::eErrorOutOfDateKHR)
     {
-        auto [swapchain, framebuffers] = recreate_swapchain_and_framebuffers(
+        std::tie(m_swapchain_info, m_frame_buffers) = recreate_swapchain_and_framebuffers(
             m_physical_device, m_surface, m_device, nullptr, m_example_renderpass
         );
-        m_swapchain_info = swapchain;
-        m_frame_buffers = framebuffers;
         return;
     }
     else if (image_index_result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR)
@@ -241,13 +241,11 @@ void APIVulkan::draw_frame()
             m_render_finished[current_frame], m_swapchain_info.swapchain, image_index
         ));
     }
-    catch (const vk::OutOfDateKHRError&) // handle resize
+    catch (const vk::OutOfDateKHRError&)  // handle resize
     {
-        auto [swapchain, framebuffers] = recreate_swapchain_and_framebuffers(
+        std::tie(m_swapchain_info, m_frame_buffers) = recreate_swapchain_and_framebuffers(
             m_physical_device, m_surface, m_device, nullptr, m_example_renderpass
         );
-        m_swapchain_info = swapchain;
-        m_frame_buffers = framebuffers;
     }
 
     current_frame = current_frame++ % MAX_FRAMES_IN_FLIGHT;
@@ -941,7 +939,7 @@ void APIVulkan::create_color_resources(
     vk::DeviceMemory& out_memory
 )
 {
-    auto [image, memory] = create_image(
+    std::tie(out_image, out_memory) = create_image(
         swapchain.extent.width,
         swapchain.extent.height,
         1,
@@ -952,12 +950,9 @@ void APIVulkan::create_color_resources(
         vk::MemoryPropertyFlagBits::eDeviceLocal
     );
 
-    out_image = image;
-    out_memory = memory;
-
     out_img_view = m_device.createImageView(vk::ImageViewCreateInfo{
         vk::ImageViewCreateFlags(),
-        image,
+        out_image,
         vk::ImageViewType::e2D,
         swapchain.format,
         vk::ComponentMapping(),
@@ -972,7 +967,7 @@ void APIVulkan::create_depth_resources(
     vk::DeviceMemory& out_memory
 )
 {
-    auto [image, memory] = create_image(
+    std::tie(out_image, out_memory) = create_image(
         swapchain.extent.width,
         swapchain.extent.height,
         1,
@@ -983,12 +978,9 @@ void APIVulkan::create_depth_resources(
         vk::MemoryPropertyFlagBits::eDeviceLocal
     );
 
-    out_image = image;
-    out_memory = memory;
-
     out_img_view = m_device.createImageView(vk::ImageViewCreateInfo{
         vk::ImageViewCreateFlags(),
-        image,
+        out_image,
         vk::ImageViewType::e2D,
         DEPTH_FORMAT,
         vk::ComponentMapping(),
@@ -1086,6 +1078,32 @@ void APIVulkan::create_sync_objects()
             m_device.createFence(vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
     }
 }
+std::tuple<vk::Buffer, vk::DeviceMemory> APIVulkan::create_buffer(
+    uint32_t size,
+    vk::BufferUsageFlags usage,
+    vk::SharingMode sharing_mode,
+    vk::MemoryPropertyFlags properties
+)
+{
+    auto families = get_queue_families(m_physical_device);
+    const std::array<uint32_t, 3> used_families = {
+        families.graphics.value(), families.transfer.value(), families.compute.value()
+    };
+
+    auto buffer = m_device.createBuffer(
+        vk::BufferCreateInfo(vk::BufferCreateFlags(), size, usage, sharing_mode, used_families)
+    );
+
+    auto mem_req = m_device.getBufferMemoryRequirements(buffer);
+
+    auto buffer_memory = m_device.allocateMemory(
+        vk::MemoryAllocateInfo(mem_req.size, find_memory_type(mem_req.memoryTypeBits, properties))
+    );
+    m_device.bindBufferMemory(buffer, buffer_memory, 0);
+
+    return {buffer, buffer_memory};
+}
+
 void APIVulkan::cleanup_swapchain(VkSwapchainInfo& swapchain)
 {
     for (const auto& framebuffer : m_frame_buffers)

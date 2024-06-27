@@ -62,6 +62,9 @@ private:
     vk::DescriptorSetLayout m_example_descriptor_set_layout;
     vk::CommandPool m_example_command_pool;
     std::vector<vk::CommandBuffer> m_example_command_buffers;
+    // model related
+    vk::Buffer m_camaro_vb;
+    vk::DeviceMemory m_camaro_vb_memory;
 
 private:
     void create_instance(const Window& window, bool enable_validation_layers);
@@ -167,5 +170,12 @@ private:
     void record_example_command_buffer(vk::CommandBuffer buffer, uint32_t image_index);
 
     void create_sync_objects();
+
+    std::tuple<vk::Buffer, vk::DeviceMemory> create_buffer(
+        uint32_t size,
+        vk::BufferUsageFlags usage,
+        vk::SharingMode sharing_mode,
+        vk::MemoryPropertyFlags properties
+    );
 };
 }  // namespace BE_NAMESPACE
