@@ -1,10 +1,10 @@
 #pragma once
 
 #include "api_interface.h"
+#include "mesh.h"
 #include "spirv_shader.h"
 #include "vulkan/api_vulkan_structs.h"
 #include "window.h"
-#include "mesh.h"
 
 namespace BE_NAMESPACE
 {
@@ -26,8 +26,10 @@ private:
     const std::vector<const char*> m_required_device_extensions{VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
     const vk::Format DEPTH_FORMAT = vk::Format::eD32SfloatS8Uint;
-    const vk::ClearValue CLEAR_VALUE = vk::ClearValue({0.0f, 0.0f, 0.0f, 1.0f});
-    const int MAX_FRAMES_IN_FLIGHT = 2; // TODO: restore 2
+    const std::array<vk::ClearValue, 2> CLEAR_VALUES = {
+        vk::ClearColorValue({0.0f, 0.0f, 0.0f, 1.0f}), vk::ClearDepthStencilValue(1.0f, 0.0f)
+    };
+    const int MAX_FRAMES_IN_FLIGHT = 2;  // TODO: restore 2
 
     bool b_use_validation_layers = false;
     Window& m_window_ref;
@@ -74,7 +76,7 @@ private:
 
     std::vector<vk::Buffer> m_uniform_buffers;
     std::vector<vk::DeviceMemory> m_unifform_buffers_memory;
-    std::vector<void*>  m_uniform_buffers_mapped;
+    std::vector<void*> m_uniform_buffers_mapped;
 
 private:
     void create_instance(const Window& window, bool enable_validation_layers);
@@ -182,6 +184,9 @@ private:
     auto create_command_buffer(vk::CommandPool pool, vk::CommandBufferLevel level)
         -> vk::CommandBuffer;
 
+    auto begin_one_time_commands(vk::CommandPool pool) -> vk::CommandBuffer;
+    void end_one_time_commands(vk::CommandBuffer buffer, vk::Queue queue, vk::CommandPool pool);
+
     void record_example_command_buffer(vk::CommandBuffer buffer, uint32_t image_index);
 
     void create_sync_objects();
@@ -197,5 +202,6 @@ private:
 
     auto create_descriptor_pool(vk::DescriptorType type, uint32_t size) -> vk::DescriptorPool;
     auto create_descriptor_sets(uint32_t count) -> std::vector<vk::DescriptorSet>;
+    auto has_stencil_component(vk::Format format) -> bool;
 };
 }  // namespace BE_NAMESPACE

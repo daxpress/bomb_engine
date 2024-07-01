@@ -3,9 +3,9 @@
 
 layout (binding = 0) uniform UniformBufferObject
 {
-	vec4 model;
-	vec4 view;
-	vec4 projection;
+	mat4 model;
+	mat4 view;
+	mat4 projection;
 } mvp;
 
 layout (location = 0) in vec3 inPosition;
@@ -17,7 +17,7 @@ layout (location = 1) out vec2 fragTexCoord;
 
 void main()
 {
-	gl_Position = mvp.projection * mvp.view * mvp.model * vec4(inPosition, 1);
+	gl_Position = mvp.projection * mvp.view * mvp.model * vec4(inPosition, 1.0);
 	fragColor = inColor;
 	fragTexCoord = inTexCoord;
 }

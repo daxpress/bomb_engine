@@ -209,7 +209,7 @@ APIVulkan::~APIVulkan()
 
 void APIVulkan::draw_frame()
 {
-    //std::cout << current_frame << std::endl;
+    // std::cout << current_frame << std::endl;
 
     auto result = m_device.waitForFences(
         m_in_flight[current_frame], true, std::numeric_limits<uint64_t>().max()
@@ -734,6 +734,70 @@ void APIVulkan::transition_image_layout(
     uint32_t mips
 )
 {
+    auto buffer = begin_one_time_commands(m_example_command_pool);
+
+    vk::ImageMemoryBarrier barrier{};
+
+    barrier.oldLayout = old_layout;
+    barrier.newLayout = new_layout;
+    barrier.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
+    barrier.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
+    barrier.image = image;
+    if (new_layout == vk::ImageLayout::eDepthStencilAttachmentOptimal)
+    {
+        barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eDepth;
+        if (has_stencil_component(format))
+        {
+            barrier.subresourceRange.aspectMask |= vk::ImageAspectFlagBits::eStencil;
+        }
+    }
+    else
+    {
+        barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+    }
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = mips;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+
+    vk::PipelineStageFlags src_stage;
+    vk::PipelineStageFlags dst_stage;
+
+    if (old_layout == vk::ImageLayout::eUndefined &&
+        new_layout == vk::ImageLayout::eTransferDstOptimal)
+    {
+        barrier.srcAccessMask = vk::AccessFlagBits::eNone;
+        barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
+
+        src_stage = vk::PipelineStageFlagBits::eTopOfPipe;
+        dst_stage = vk::PipelineStageFlagBits::eTransfer;
+    }
+    else if (old_layout == vk::ImageLayout::eUndefined &&
+             new_layout == vk::ImageLayout::eShaderReadOnlyOptimal)
+    {
+        barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+        barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
+
+        src_stage = vk::PipelineStageFlagBits::eTransfer;
+        dst_stage = vk::PipelineStageFlagBits::eFragmentShader;
+    }
+    else if (old_layout == vk::ImageLayout::eUndefined &&
+             new_layout == vk::ImageLayout::eDepthStencilAttachmentOptimal)
+    {
+        barrier.srcAccessMask = vk::AccessFlagBits::eNone;
+        barrier.dstAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentRead |
+                                vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+        src_stage = vk::PipelineStageFlagBits::eTopOfPipe;
+        dst_stage = vk::PipelineStageFlagBits::eEarlyFragmentTests;
+    }
+    else
+    {
+        throw std::runtime_error("unsupported layout transition!");
+    }
+
+    buffer.pipelineBarrier(src_stage, dst_stage, vk::DependencyFlags(), nullptr, nullptr, barrier);
+
+    end_one_time_commands(buffer, m_graphics_queue, m_example_command_pool);
 }
 
 auto APIVulkan::create_example_pipeline() -> vk::Pipeline
@@ -777,6 +841,8 @@ auto APIVulkan::create_example_pipeline() -> vk::Pipeline
     vk::PipelineDepthStencilStateCreateInfo depth_stencil(
         vk::PipelineDepthStencilStateCreateFlagBits(), true, true, vk::CompareOp::eLess
     );
+    depth_stencil.depthBoundsTestEnable = false;
+    depth_stencil.stencilTestEnable = false;
 
     auto binding_desc = VertexData::get_binding_description();
     auto attrib_desc = VertexData::get_attribute_descriptions();
@@ -811,7 +877,7 @@ auto APIVulkan::create_example_pipeline() -> vk::Pipeline
     raster.frontFace = vk::FrontFace::eCounterClockwise;
 
     vk::PipelineMultisampleStateCreateInfo multisampling(
-        vk::PipelineMultisampleStateCreateFlagBits(), vk::SampleCountFlagBits::e8
+        vk::PipelineMultisampleStateCreateFlagBits(), vk::SampleCountFlagBits::e8, true, 0.20f
     );
 
     vk::PipelineColorBlendAttachmentState color_attachment(
@@ -880,8 +946,8 @@ auto APIVulkan::create_example_render_pass() -> vk::RenderPass
         vk::AttachmentDescriptionFlagBits(),
         DEPTH_FORMAT,
         vk::SampleCountFlagBits::e8,
-        vk::AttachmentLoadOp::eDontCare,
-        vk::AttachmentStoreOp::eStore,
+        vk::AttachmentLoadOp::eClear,
+        vk::AttachmentStoreOp::eDontCare,
         vk::AttachmentLoadOp::eDontCare,
         vk::AttachmentStoreOp::eDontCare,
         vk::ImageLayout::eUndefined,
@@ -919,7 +985,7 @@ auto APIVulkan::create_example_render_pass() -> vk::RenderPass
         vk::PipelineStageFlagBits::eColorAttachmentOutput |
             vk::PipelineStageFlagBits::eEarlyFragmentTests,
         vk::AccessFlagBits::eDepthStencilAttachmentWrite,
-        vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eDepthStencilAttachmentWrite
+        vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite
     );
 
     std::array<vk::AttachmentDescription, 3> attachments{
@@ -994,7 +1060,7 @@ void APIVulkan::create_example_ib()
     );
 
     auto data = m_device.mapMemory(buffermem, 0, size);
-    memcpy(data, m_camaro->m_vertices.data(), size);
+    memcpy(data, m_camaro->m_indices.data(), size);
     m_device.unmapMemory(buffermem);
 
     std::tie(m_camaro_ib, m_camaro_ib_memory) = create_buffer(
@@ -1046,13 +1112,14 @@ void APIVulkan::update_uniform_buffer(uint32_t image_index)
     ubo.view = glm::lookAt(glm::vec3(2.0f), glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     ubo.projection = glm::perspective(
         glm::radians(45.0f),
-        m_swapchain_info.extent.width / static_cast<float>(m_swapchain_info.extent.height),
+        static_cast<float>(m_swapchain_info.extent.width) /
+            static_cast<float>(m_swapchain_info.extent.height),
         0.1f,
         10.0f
     );
     ubo.projection[1][1] *= -1;
 
-    memcpy(m_uniform_buffers_mapped[image_index], &ubo, sizeof(ubo));
+    memcpy(m_uniform_buffers_mapped[image_index], &ubo, sizeof(UniformBufferObject));
 }
 
 void APIVulkan::populate_example_desc_sets()
@@ -1127,6 +1194,14 @@ void APIVulkan::create_depth_resources(
         vk::ComponentMapping(),
         vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1}
     });
+
+    transition_image_layout(
+        out_image,
+        DEPTH_FORMAT,
+        vk::ImageLayout::eUndefined,
+        vk::ImageLayout::eDepthStencilAttachmentOptimal,
+        1
+    );
 }
 
 auto APIVulkan::create_frame_buffers(VkSwapchainInfo swapchain, vk::RenderPass render_pass)
@@ -1174,6 +1249,26 @@ auto APIVulkan::create_command_buffer(vk::CommandPool pool, vk::CommandBufferLev
     return create_command_buffers(pool, level, 1)[0];
 }
 
+auto APIVulkan::begin_one_time_commands(vk::CommandPool pool) -> vk::CommandBuffer
+{
+    auto buffer = m_device.allocateCommandBuffers(
+        vk::CommandBufferAllocateInfo(pool, vk::CommandBufferLevel::ePrimary, 1)
+    )[0];  // get the first and only element
+    buffer.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+    return buffer;
+}
+
+void APIVulkan::end_one_time_commands(
+    vk::CommandBuffer buffer, vk::Queue queue, vk::CommandPool pool
+)
+{
+    buffer.end();
+    queue.submit(vk::SubmitInfo(nullptr, nullptr, buffer, nullptr));
+    queue.waitIdle();
+
+    m_device.freeCommandBuffers(pool, buffer);
+}
+
 void APIVulkan::record_example_command_buffer(vk::CommandBuffer buffer, uint32_t image_index)
 {
     buffer.begin(vk::CommandBufferBeginInfo());
@@ -1183,7 +1278,7 @@ void APIVulkan::record_example_command_buffer(vk::CommandBuffer buffer, uint32_t
             m_example_renderpass,
             m_frame_buffers[image_index],
             vk::Rect2D({0, 0}, m_swapchain_info.extent),
-            CLEAR_VALUE
+            CLEAR_VALUES
         ),
         vk::SubpassContents::eInline
     );
@@ -1288,6 +1383,11 @@ auto APIVulkan::create_descriptor_sets(uint32_t count) -> std::vector<vk::Descri
     return m_device.allocateDescriptorSets(
         vk::DescriptorSetAllocateInfo(m_example_desc_pool, layouts)
     );
+}
+
+auto APIVulkan::has_stencil_component(vk::Format format) -> bool
+{
+    return format == vk::Format::eD32SfloatS8Uint || format == vk::Format::eD24UnormS8Uint;
 }
 
 void APIVulkan::cleanup_swapchain(VkSwapchainInfo& swapchain)
