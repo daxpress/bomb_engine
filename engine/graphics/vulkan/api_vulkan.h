@@ -4,6 +4,7 @@
 #include "spirv_shader.h"
 #include "vulkan/api_vulkan_structs.h"
 #include "window.h"
+#include "mesh.h"
 
 namespace BE_NAMESPACE
 {
@@ -26,7 +27,7 @@ private:
 
     const vk::Format DEPTH_FORMAT = vk::Format::eD32SfloatS8Uint;
     const vk::ClearValue CLEAR_VALUE = vk::ClearValue({0.0f, 0.0f, 0.0f, 1.0f});
-    const int MAX_FRAMES_IN_FLIGHT = 2;
+    const int MAX_FRAMES_IN_FLIGHT = 2; // TODO: restore 2
 
     bool b_use_validation_layers = false;
     Window& m_window_ref;
@@ -62,9 +63,18 @@ private:
     vk::DescriptorSetLayout m_example_descriptor_set_layout;
     vk::CommandPool m_example_command_pool;
     std::vector<vk::CommandBuffer> m_example_command_buffers;
+    vk::DescriptorPool m_example_desc_pool;
+    std::vector<vk::DescriptorSet> m_example_desc_sets;
     // model related
+    std::shared_ptr<Mesh> m_camaro;
     vk::Buffer m_camaro_vb;
+    vk::Buffer m_camaro_ib;
     vk::DeviceMemory m_camaro_vb_memory;
+    vk::DeviceMemory m_camaro_ib_memory;
+
+    std::vector<vk::Buffer> m_uniform_buffers;
+    std::vector<vk::DeviceMemory> m_unifform_buffers_memory;
+    std::vector<void*>  m_uniform_buffers_mapped;
 
 private:
     void create_instance(const Window& window, bool enable_validation_layers);
@@ -142,6 +152,11 @@ private:
     auto create_example_pipeline() -> vk::Pipeline;
     auto create_example_render_pass() -> vk::RenderPass;
     auto create_example_pipeline_layout() -> vk::PipelineLayout;
+    void create_example_vb();
+    void create_example_ib();
+    void create_example_uniform_buffers();
+    void update_uniform_buffer(uint32_t image_index);
+    void populate_example_desc_sets();
 
     void create_color_resources(
         const VkSwapchainInfo& swapchain,
@@ -171,11 +186,16 @@ private:
 
     void create_sync_objects();
 
-    std::tuple<vk::Buffer, vk::DeviceMemory> create_buffer(
+    auto create_buffer(
         uint32_t size,
         vk::BufferUsageFlags usage,
         vk::SharingMode sharing_mode,
         vk::MemoryPropertyFlags properties
-    );
+    ) -> std::tuple<vk::Buffer, vk::DeviceMemory>;
+
+    void copy_buffer(vk::Buffer src, vk::Buffer dst, size_t size);
+
+    auto create_descriptor_pool(vk::DescriptorType type, uint32_t size) -> vk::DescriptorPool;
+    auto create_descriptor_sets(uint32_t count) -> std::vector<vk::DescriptorSet>;
 };
 }  // namespace BE_NAMESPACE

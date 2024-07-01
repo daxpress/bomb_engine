@@ -24,3 +24,9 @@ add_custom_command(
 	$<TARGET_PROPERTY:bomb_engine_engine,SOURCE_DIR>/graphics/shaders
 	$<TARGET_FILE_DIR:bomb_engine_editor>/shaders
 )
+add_custom_command(
+	TARGET bomb_engine_editor
+	COMMAND ${CMAKE_COMMAND} -E copy_directory
+	$<TARGET_PROPERTY:bomb_engine_engine,SOURCE_DIR>/graphics/assets
+	$<TARGET_FILE_DIR:bomb_engine_editor>/assets
+)

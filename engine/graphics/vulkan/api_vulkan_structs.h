@@ -35,4 +35,11 @@ struct VkSwapchainInfo
     vk::Format format;
     vk::Extent2D extent;
 };
+
+struct UniformBufferObject
+{
+    alignas(16) glm::mat4 model;
+    alignas(16) glm::mat4 view;
+    alignas(16) glm::mat4 projection;
+};
 }  // namespace BE_NAMESPACE
