@@ -9,4 +9,6 @@
 #include <glm/glm.hpp>
 #include <spirv_glsl.hpp>
 #include <spirv_hlsl.hpp>
+
+// resources
 #include <tiny_obj_loader.h>

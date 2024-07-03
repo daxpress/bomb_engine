@@ -6,6 +6,9 @@
 #include "file_helper.h"
 #include "vertex_data.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
 // TODO: Replace exceptions with logs (can also throw exceptions but they must
 // be engine-breaking!)
 
@@ -155,9 +158,21 @@ APIVulkan::APIVulkan(Window& window, bool enable_validation_layers)
     );
     m_frame_buffers = create_frame_buffers(m_swapchain_info, m_example_renderpass);
 
-    m_camaro = std::make_shared<Mesh>("assets/CAMARO.obj");
+    m_model = std::make_shared<Mesh>("assets/models/viking_room.obj");
     create_example_vb();
     create_example_ib();
+
+    // TODO add texture
+    create_example_texture();
+    m_example_image_view = m_device.createImageView(vk::ImageViewCreateInfo(
+        vk::ImageViewCreateFlags(),
+        m_example_image,
+        vk::ImageViewType::e2D,
+        vk::Format::eR8G8B8A8Srgb,
+        {},
+        vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, m_example_mips, 0, 1)
+    ));
+    m_example_sampler = create_image_sampler(vk::Filter::eLinear, vk::SamplerAddressMode::eRepeat);
 
     create_example_uniform_buffers();
     m_example_desc_pool =
@@ -175,10 +190,15 @@ APIVulkan::~APIVulkan()
 {
     m_device.waitIdle();
 
-    m_device.destroyBuffer(m_camaro_ib);
-    m_device.destroyBuffer(m_camaro_vb);
-    m_device.freeMemory(m_camaro_ib_memory);
-    m_device.freeMemory(m_camaro_vb_memory);
+    m_device.destroyImageView(m_example_image_view);
+    m_device.destroyImage(m_example_image);
+    m_device.freeMemory(m_example_image_memory);
+    m_device.destroySampler(m_example_sampler);
+
+    m_device.destroyBuffer(m_model_ib);
+    m_device.destroyBuffer(m_model_vb);
+    m_device.freeMemory(m_model_ib_memory);
+    m_device.freeMemory(m_model_vb_memory);
 
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {
@@ -800,6 +820,147 @@ void APIVulkan::transition_image_layout(
     end_one_time_commands(buffer, m_graphics_queue, m_example_command_pool);
 }
 
+void APIVulkan::copy_buffer_to_image(
+    vk::Buffer src_buffer, vk::Image image, uint32_t width, uint32_t height
+)
+{
+    auto buffer = begin_one_time_commands(m_example_command_pool);
+
+    vk::BufferImageCopy region(
+        0,
+        0,
+        0,
+        vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1),
+        {0, 0, 0},
+        {width, height, 1}
+    );
+
+    buffer.copyBufferToImage(src_buffer, image, vk::ImageLayout::eTransferDstOptimal, region);
+    end_one_time_commands(buffer, m_graphics_queue, m_example_command_pool);
+}
+
+auto APIVulkan::create_image_sampler(vk::Filter filter, vk::SamplerAddressMode address_mode)
+    -> vk::Sampler
+{
+    vk::SamplerCreateInfo sampler_info{};
+    sampler_info.magFilter = filter;
+    sampler_info.minFilter = filter;
+
+    sampler_info.addressModeU = address_mode;
+    sampler_info.addressModeV = address_mode;
+    sampler_info.addressModeW = address_mode;
+
+    sampler_info.anisotropyEnable = true;
+
+    auto properties = m_physical_device.getProperties();
+
+    sampler_info.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+    sampler_info.borderColor = vk::BorderColor::eIntOpaqueBlack;
+    sampler_info.unnormalizedCoordinates = false;
+    sampler_info.compareEnable = true;
+    sampler_info.compareOp = vk::CompareOp::eAlways;
+
+    sampler_info.mipmapMode = vk::SamplerMipmapMode::eLinear;
+    sampler_info.mipLodBias = 1.0f;
+    sampler_info.minLod = 0.0f;
+    sampler_info.maxLod = vk::LodClampNone;
+
+    return m_device.createSampler(sampler_info);
+}
+
+void APIVulkan::generate_mipmaps(
+    vk::Image image, vk::Format format, uint32_t width, uint32_t height, uint32_t mips
+)
+{
+    auto properties = m_physical_device.getFormatProperties(format);
+
+    if (!(properties.optimalTilingFeatures & vk::FormatFeatureFlagBits::eSampledImageFilterLinear))
+    {
+        throw std::runtime_error("texture image format does not support linear binding!");
+    }
+    auto command_buffer = begin_one_time_commands(m_example_command_pool);
+
+    vk::ImageMemoryBarrier barrier{};
+
+    barrier.image = image;
+    barrier.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
+    barrier.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
+    barrier.subresourceRange =
+        vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1);
+
+    int32_t mip_width = width;
+    int32_t mip_height = height;
+
+    for (uint32_t i = 1; i < mips; i++)
+    {
+        barrier.subresourceRange.baseMipLevel = i - 1;
+        barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal;
+        barrier.newLayout = vk::ImageLayout::eTransferSrcOptimal;
+        barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+        barrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;
+
+        command_buffer.pipelineBarrier(
+            vk::PipelineStageFlagBits::eTransfer,
+            vk::PipelineStageFlagBits::eTransfer,
+            vk::DependencyFlags(),
+            nullptr,
+            nullptr,
+            barrier
+        );
+
+        vk::ImageBlit blit(
+            vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, i - 1, 0, 1),
+            {vk::Offset3D(0, 0, 0), vk::Offset3D(mip_width, mip_height, 1)},
+            vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, i, 0, 1),
+            {vk::Offset3D(0, 0, 0),
+             vk::Offset3D(mip_width > 1 ? mip_width / 2 : 1, mip_height > 1 ? mip_height / 2 : 1, 1)
+            }
+        );
+
+        command_buffer.blitImage(
+            image,
+            vk::ImageLayout::eTransferSrcOptimal,
+            image,
+            vk::ImageLayout::eTransferDstOptimal,
+            blit,
+            vk::Filter::eLinear
+        );
+
+        barrier.oldLayout = vk::ImageLayout::eTransferSrcOptimal;
+        barrier.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+        barrier.srcAccessMask = vk::AccessFlagBits::eTransferRead;
+        barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
+
+        command_buffer.pipelineBarrier(
+            vk::PipelineStageFlagBits::eTransfer,
+            vk::PipelineStageFlagBits::eFragmentShader,
+            vk::DependencyFlags(),
+            nullptr,
+            nullptr,
+            barrier
+        );
+
+        if (mip_width > 1) mip_width /= 2;
+        if (mip_height > 1) mip_height /= 2;
+    }
+
+    barrier.subresourceRange.baseMipLevel = mips - 1;
+    barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal;
+    barrier.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+    barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
+
+    command_buffer.pipelineBarrier(
+        vk::PipelineStageFlagBits::eTransfer,
+        vk::PipelineStageFlagBits::eFragmentShader,
+        vk::DependencyFlags(),
+        nullptr,
+        nullptr,
+        barrier
+    );
+    end_one_time_commands(command_buffer, m_graphics_queue, m_example_command_pool);
+}
+
 auto APIVulkan::create_example_pipeline() -> vk::Pipeline
 {
     SPIRVShader vertex, fragment;
@@ -1002,11 +1163,11 @@ auto APIVulkan::create_example_pipeline_layout() -> vk::PipelineLayout
     vk::DescriptorSetLayoutBinding projection(
         0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex
     );
-    // vk::DescriptorSetLayoutBinding sampler(
-    //     1, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment
-    //);
+    vk::DescriptorSetLayoutBinding sampler(
+        1, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment
+    );
 
-    std::array<vk::DescriptorSetLayoutBinding, 1> bindings{projection, /*sampler*/};
+    std::array<vk::DescriptorSetLayoutBinding, 2> bindings{projection, sampler};
 
     vk::DescriptorSetLayoutCreateInfo layout_info(
         vk::DescriptorSetLayoutCreateFlagBits(), bindings
@@ -1022,7 +1183,7 @@ auto APIVulkan::create_example_pipeline_layout() -> vk::PipelineLayout
 
 void APIVulkan::create_example_vb()
 {
-    auto size = m_camaro->m_vertices.size() * sizeof(m_camaro->m_vertices[0]);
+    auto size = m_model->m_vertices.size() * sizeof(m_model->m_vertices[0]);
 
     auto [buffer, buffermem] = create_buffer(
         size,
@@ -1032,17 +1193,17 @@ void APIVulkan::create_example_vb()
     );
 
     auto data = m_device.mapMemory(buffermem, 0, size);
-    memcpy(data, m_camaro->m_vertices.data(), size);
+    memcpy(data, m_model->m_vertices.data(), size);
     m_device.unmapMemory(buffermem);
 
-    std::tie(m_camaro_vb, m_camaro_vb_memory) = create_buffer(
+    std::tie(m_model_vb, m_model_vb_memory) = create_buffer(
         size,
         vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
         vk::SharingMode::eExclusive,
         vk::MemoryPropertyFlagBits::eDeviceLocal
     );
 
-    copy_buffer(buffer, m_camaro_vb, size);
+    copy_buffer(buffer, m_model_vb, size);
 
     m_device.destroyBuffer(buffer);
     m_device.freeMemory(buffermem);
@@ -1050,7 +1211,7 @@ void APIVulkan::create_example_vb()
 
 void APIVulkan::create_example_ib()
 {
-    auto size = m_camaro->m_indices.size() * sizeof(m_camaro->m_indices[0]);
+    auto size = m_model->m_indices.size() * sizeof(m_model->m_indices[0]);
 
     auto [buffer, buffermem] = create_buffer(
         size,
@@ -1060,17 +1221,17 @@ void APIVulkan::create_example_ib()
     );
 
     auto data = m_device.mapMemory(buffermem, 0, size);
-    memcpy(data, m_camaro->m_indices.data(), size);
+    memcpy(data, m_model->m_indices.data(), size);
     m_device.unmapMemory(buffermem);
 
-    std::tie(m_camaro_ib, m_camaro_ib_memory) = create_buffer(
+    std::tie(m_model_ib, m_model_ib_memory) = create_buffer(
         size,
         vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
         vk::SharingMode::eExclusive,
         vk::MemoryPropertyFlagBits::eDeviceLocal
     );
 
-    copy_buffer(buffer, m_camaro_ib, size);
+    copy_buffer(buffer, m_model_ib, size);
 
     m_device.destroyBuffer(buffer);
     m_device.freeMemory(buffermem);
@@ -1126,8 +1287,10 @@ void APIVulkan::populate_example_desc_sets()
 {
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {
+        std::array<vk::WriteDescriptorSet, 2> writes{};
+
         vk::DescriptorBufferInfo buffer_info(m_uniform_buffers[i], 0, sizeof(UniformBufferObject));
-        vk::WriteDescriptorSet write(
+        writes[0] = vk::WriteDescriptorSet(
             m_example_desc_sets[i],
             0,
             0,
@@ -1136,8 +1299,75 @@ void APIVulkan::populate_example_desc_sets()
             buffer_info,
             nullptr
         );
-        m_device.updateDescriptorSets(write, nullptr);
+        vk::DescriptorImageInfo img_info(
+            m_example_sampler, m_example_image_view, vk::ImageLayout::eShaderReadOnlyOptimal
+        );
+        writes[1] = vk::WriteDescriptorSet(
+            m_example_desc_sets[i],
+            1,
+            0,
+            vk::DescriptorType::eCombinedImageSampler,
+            img_info,
+            nullptr,
+            nullptr
+        );
+        m_device.updateDescriptorSets(writes, nullptr);
     }
+}
+
+void APIVulkan::create_example_texture()
+{
+    int width, height, channels;
+    auto pixels =
+        stbi_load("assets/textures/viking_room.png", &width, &height, &channels, STBI_rgb_alpha);
+    size_t buffer_size = width * height * 4;
+
+    uint32_t miplevels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
+    m_example_mips = miplevels;
+
+    if (!pixels)
+    {
+        throw std::runtime_error("failed to load texture image!");
+    }
+
+    auto [buffer, buffer_mem] = create_buffer(
+        buffer_size,
+        vk::BufferUsageFlagBits::eTransferSrc,
+        vk::SharingMode::eExclusive,
+        vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible
+    );
+
+    auto data = m_device.mapMemory(buffer_mem, 0, buffer_size);
+    memcpy(data, pixels, buffer_size);
+    m_device.unmapMemory(buffer_mem);
+
+    stbi_image_free(pixels);
+
+    std::tie(m_example_image, m_example_image_memory) = create_image(
+        width,
+        height,
+        miplevels,
+        vk::SampleCountFlagBits::e1,
+        vk::Format::eR8G8B8A8Srgb,
+        vk::ImageTiling::eOptimal,
+        vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc |
+            vk::ImageUsageFlagBits::eSampled,
+        vk::MemoryPropertyFlagBits::eDeviceLocal
+    );
+
+    transition_image_layout(
+        m_example_image,
+        vk::Format::eR8G8B8A8Srgb,
+        vk::ImageLayout::eUndefined,
+        vk::ImageLayout::eTransferDstOptimal,
+        miplevels
+    );
+    copy_buffer_to_image(buffer, m_example_image, width, height);
+
+    generate_mipmaps(m_example_image, vk::Format::eR8G8B8A8Srgb, width, height, miplevels);
+
+    m_device.destroyBuffer(buffer);
+    m_device.freeMemory(buffer_mem);
 }
 
 void APIVulkan::create_color_resources(
@@ -1285,8 +1515,8 @@ void APIVulkan::record_example_command_buffer(vk::CommandBuffer buffer, uint32_t
 
     buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, m_example_pipeline);
     size_t offsets[] = {0};
-    buffer.bindVertexBuffers(0, m_camaro_vb, offsets);
-    buffer.bindIndexBuffer(m_camaro_ib, 0, vk::IndexType::eUint32);
+    buffer.bindVertexBuffers(0, m_model_vb, offsets);
+    buffer.bindIndexBuffer(m_model_ib, 0, vk::IndexType::eUint32);
 
     auto viewport = vk::Viewport(
         0.0f, 0.0f, m_swapchain_info.extent.width, m_swapchain_info.extent.height, 0.0f, 1.0f
@@ -1303,7 +1533,7 @@ void APIVulkan::record_example_command_buffer(vk::CommandBuffer buffer, uint32_t
         m_example_desc_sets[current_frame],
         nullptr
     );
-    buffer.drawIndexed(m_camaro->m_indices.size(), 1, 0, 0, 0);
+    buffer.drawIndexed(m_model->m_indices.size(), 1, 0, 0, 0);
 
     buffer.endRenderPass();
 

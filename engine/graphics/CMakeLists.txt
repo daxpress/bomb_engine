@@ -17,7 +17,8 @@ find_package(glm CONFIG REQUIRED)
 find_package(Vulkan REQUIRED)
 find_package(spirv-cross REQUIRED)
 find_package(tinyobjloader REQUIRED)
+find_package(stb REQUIRED)
 
 target_link_libraries(bomb_engine_graphics
 bomb_engine_utilities
-glfw glm::glm Vulkan::Vulkan spirv-cross::spirv-cross tinyobjloader::tinyobjloader)
+glfw glm::glm Vulkan::Vulkan spirv-cross::spirv-cross tinyobjloader::tinyobjloader stb::stb)

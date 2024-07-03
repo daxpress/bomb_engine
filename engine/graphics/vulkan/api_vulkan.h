@@ -67,12 +67,17 @@ private:
     std::vector<vk::CommandBuffer> m_example_command_buffers;
     vk::DescriptorPool m_example_desc_pool;
     std::vector<vk::DescriptorSet> m_example_desc_sets;
+    vk::Sampler m_example_sampler;
+    vk::ImageView m_example_image_view;
+    vk::Image m_example_image;
+    vk::DeviceMemory m_example_image_memory;
+    uint32_t m_example_mips;
     // model related
-    std::shared_ptr<Mesh> m_camaro;
-    vk::Buffer m_camaro_vb;
-    vk::Buffer m_camaro_ib;
-    vk::DeviceMemory m_camaro_vb_memory;
-    vk::DeviceMemory m_camaro_ib_memory;
+    std::shared_ptr<Mesh> m_model;
+    vk::Buffer m_model_vb;
+    vk::Buffer m_model_ib;
+    vk::DeviceMemory m_model_vb_memory;
+    vk::DeviceMemory m_model_ib_memory;
 
     std::vector<vk::Buffer> m_uniform_buffers;
     std::vector<vk::DeviceMemory> m_unifform_buffers_memory;
@@ -148,6 +153,9 @@ private:
         vk::ImageLayout new_layout,
         uint32_t mips
     );
+    void copy_buffer_to_image(vk::Buffer, vk::Image image, uint32_t width, uint32_t height);
+    auto create_image_sampler(vk::Filter filter, vk::SamplerAddressMode address_mode) -> vk::Sampler;
+    void generate_mipmaps(vk::Image image, vk::Format format, uint32_t width, uint32_t height, uint32_t mips);
 
     // these are required to get ourselves to draw something in the editor in order to have easier
     // refactoring and feature introduction
@@ -159,6 +167,7 @@ private:
     void create_example_uniform_buffers();
     void update_uniform_buffer(uint32_t image_index);
     void populate_example_desc_sets();
+    void create_example_texture();
 
     void create_color_resources(
         const VkSwapchainInfo& swapchain,
