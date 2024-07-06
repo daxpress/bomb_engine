@@ -136,6 +136,7 @@ APIVulkan::APIVulkan(Window& window, bool enable_validation_layers)
     create_instance(window, enable_validation_layers);
     create_surface(window, m_surface);
     m_physical_device = select_physical_device();
+    m_msaa_samples = get_sample_count();
     m_device = create_logical_device(m_physical_device);
     auto families = get_queue_families(m_physical_device);
     m_graphics_queue = m_device.getQueue(families.graphics.value(), 0);
@@ -162,7 +163,6 @@ APIVulkan::APIVulkan(Window& window, bool enable_validation_layers)
     create_example_vb();
     create_example_ib();
 
-    // TODO add texture
     create_example_texture();
     m_example_image_view = m_device.createImageView(vk::ImageViewCreateInfo(
         vk::ImageViewCreateFlags(),
@@ -227,69 +227,7 @@ APIVulkan::~APIVulkan()
     vkDestroySurfaceKHR(*m_vulkan_instance, m_surface, nullptr);
 }
 
-void APIVulkan::draw_frame()
-{
-    // std::cout << current_frame << std::endl;
-
-    auto result = m_device.waitForFences(
-        m_in_flight[current_frame], true, std::numeric_limits<uint64_t>().max()
-    );
-
-    auto [image_index_result, image_index] = m_device.acquireNextImageKHR(
-        m_swapchain_info.swapchain,
-        std::numeric_limits<uint64_t>().max(),
-        m_swapchain_image_available[current_frame],
-        nullptr
-    );
-
-    if (image_index_result == vk::Result::eErrorOutOfDateKHR)
-    {
-        std::tie(m_swapchain_info, m_frame_buffers) = recreate_swapchain_and_framebuffers(
-            m_physical_device, m_surface, m_device, nullptr, m_example_renderpass
-        );
-        return;
-    }
-    else if (image_index_result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR)
-    {
-        throw std::runtime_error("failed to acquire swap chain image!");
-    }
-    m_device.resetFences(m_in_flight[current_frame]);
-
-    m_example_command_buffers[current_frame].reset();
-
-    record_example_command_buffer(m_example_command_buffers[current_frame], image_index);
-
-    const std::array<vk::PipelineStageFlags, 1> wait_stages = {
-        vk::PipelineStageFlagBits::eColorAttachmentOutput
-    };
-
-    update_uniform_buffer(current_frame);
-
-    m_graphics_queue.submit(
-        vk::SubmitInfo(
-            m_swapchain_image_available[current_frame],
-            wait_stages,
-            m_example_command_buffers[current_frame],
-            m_render_finished[current_frame]
-        ),
-        m_in_flight[current_frame]
-    );
-
-    try
-    {
-        auto present_result = m_present_queue.presentKHR(vk::PresentInfoKHR(
-            m_render_finished[current_frame], m_swapchain_info.swapchain, image_index
-        ));
-    }
-    catch (const vk::OutOfDateKHRError&)  // handle resize
-    {
-        std::tie(m_swapchain_info, m_frame_buffers) = recreate_swapchain_and_framebuffers(
-            m_physical_device, m_surface, m_device, nullptr, m_example_renderpass
-        );
-    }
-
-    current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
-}
+void APIVulkan::draw_frame() { draw_example_frame(); }
 
 void APIVulkan::create_instance(const Window& window, bool enable_validation_layers)
 {
@@ -508,6 +446,23 @@ auto APIVulkan::check_extensions_support(vk::PhysicalDevice physical_device) -> 
     }
 
     return required_extensions.empty();
+}
+
+auto APIVulkan::get_sample_count() -> vk::SampleCountFlagBits
+{
+    auto properties = m_physical_device.getProperties();
+    auto counts =
+        properties.limits.framebufferColorSampleCounts &
+        properties.limits
+            .framebufferDepthSampleCounts;  // consider checking stencil in addition to these
+
+    if (counts & vk::SampleCountFlagBits::e64) return vk::SampleCountFlagBits::e64;
+    if (counts & vk::SampleCountFlagBits::e32) return vk::SampleCountFlagBits::e32;
+    if (counts & vk::SampleCountFlagBits::e16) return vk::SampleCountFlagBits::e16;
+    if (counts & vk::SampleCountFlagBits::e8) return vk::SampleCountFlagBits::e8;
+    if (counts & vk::SampleCountFlagBits::e4) return vk::SampleCountFlagBits::e4;
+    if (counts & vk::SampleCountFlagBits::e2) return vk::SampleCountFlagBits::e2;
+    return vk::SampleCountFlagBits::e1;
 }
 
 auto APIVulkan::create_logical_device(vk::PhysicalDevice physical_device) -> vk::Device
@@ -1038,7 +993,7 @@ auto APIVulkan::create_example_pipeline() -> vk::Pipeline
     raster.frontFace = vk::FrontFace::eCounterClockwise;
 
     vk::PipelineMultisampleStateCreateInfo multisampling(
-        vk::PipelineMultisampleStateCreateFlagBits(), vk::SampleCountFlagBits::e8, true, 0.20f
+        vk::PipelineMultisampleStateCreateFlagBits(), m_msaa_samples, true, 0.20f
     );
 
     vk::PipelineColorBlendAttachmentState color_attachment(
@@ -1094,7 +1049,7 @@ auto APIVulkan::create_example_render_pass() -> vk::RenderPass
     vk::AttachmentDescription color_attachment(
         vk::AttachmentDescriptionFlagBits(),
         m_swapchain_info.format,
-        vk::SampleCountFlagBits::e8,
+        m_msaa_samples,
         vk::AttachmentLoadOp::eClear,
         vk::AttachmentStoreOp::eStore,
         vk::AttachmentLoadOp::eDontCare,
@@ -1106,7 +1061,7 @@ auto APIVulkan::create_example_render_pass() -> vk::RenderPass
     vk::AttachmentDescription depth_attachment(
         vk::AttachmentDescriptionFlagBits(),
         DEPTH_FORMAT,
-        vk::SampleCountFlagBits::e8,
+        m_msaa_samples,
         vk::AttachmentLoadOp::eClear,
         vk::AttachmentStoreOp::eDontCare,
         vk::AttachmentLoadOp::eDontCare,
@@ -1370,6 +1325,68 @@ void APIVulkan::create_example_texture()
     m_device.freeMemory(buffer_mem);
 }
 
+void APIVulkan::draw_example_frame()
+{
+    auto result = m_device.waitForFences(
+        m_in_flight[m_current_frame], true, std::numeric_limits<uint64_t>().max()
+    );
+
+    auto [image_index_result, image_index] = m_device.acquireNextImageKHR(
+        m_swapchain_info.swapchain,
+        std::numeric_limits<uint64_t>().max(),
+        m_swapchain_image_available[m_current_frame],
+        nullptr
+    );
+
+    if (image_index_result == vk::Result::eErrorOutOfDateKHR)
+    {
+        std::tie(m_swapchain_info, m_frame_buffers) = recreate_swapchain_and_framebuffers(
+            m_physical_device, m_surface, m_device, nullptr, m_example_renderpass
+        );
+        return;
+    }
+    else if (image_index_result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR)
+    {
+        throw std::runtime_error("failed to acquire swap chain image!");
+    }
+    m_device.resetFences(m_in_flight[m_current_frame]);
+
+    m_example_command_buffers[m_current_frame].reset();
+
+    record_example_command_buffer(m_example_command_buffers[m_current_frame], image_index);
+
+    const std::array<vk::PipelineStageFlags, 1> wait_stages = {
+        vk::PipelineStageFlagBits::eColorAttachmentOutput
+    };
+
+    update_uniform_buffer(m_current_frame);
+
+    m_graphics_queue.submit(
+        vk::SubmitInfo(
+            m_swapchain_image_available[m_current_frame],
+            wait_stages,
+            m_example_command_buffers[m_current_frame],
+            m_render_finished[m_current_frame]
+        ),
+        m_in_flight[m_current_frame]
+    );
+
+    try
+    {
+        auto present_result = m_present_queue.presentKHR(vk::PresentInfoKHR(
+            m_render_finished[m_current_frame], m_swapchain_info.swapchain, image_index
+        ));
+    }
+    catch (const vk::OutOfDateKHRError&)  // handle resize
+    {
+        std::tie(m_swapchain_info, m_frame_buffers) = recreate_swapchain_and_framebuffers(
+            m_physical_device, m_surface, m_device, nullptr, m_example_renderpass
+        );
+    }
+
+    m_current_frame = (m_current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
+}
+
 void APIVulkan::create_color_resources(
     const VkSwapchainInfo& swapchain,
     vk::Image& out_image,
@@ -1381,7 +1398,7 @@ void APIVulkan::create_color_resources(
         swapchain.extent.width,
         swapchain.extent.height,
         1,
-        vk::SampleCountFlagBits::e8,
+        m_msaa_samples,
         swapchain.format,
         vk::ImageTiling::eOptimal,
         vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransientAttachment,
@@ -1409,7 +1426,7 @@ void APIVulkan::create_depth_resources(
         swapchain.extent.width,
         swapchain.extent.height,
         1,
-        vk::SampleCountFlagBits::e8,
+        m_msaa_samples,
         DEPTH_FORMAT,  // common for depth
         vk::ImageTiling::eOptimal,
         vk::ImageUsageFlagBits::eDepthStencilAttachment,
@@ -1530,7 +1547,7 @@ void APIVulkan::record_example_command_buffer(vk::CommandBuffer buffer, uint32_t
         vk::PipelineBindPoint::eGraphics,
         m_example_layout,
         0,
-        m_example_desc_sets[current_frame],
+        m_example_desc_sets[m_current_frame],
         nullptr
     );
     buffer.drawIndexed(m_model->m_indices.size(), 1, 0, 0, 0);

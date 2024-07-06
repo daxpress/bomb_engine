@@ -29,7 +29,8 @@ private:
     const std::array<vk::ClearValue, 2> CLEAR_VALUES = {
         vk::ClearColorValue({0.0f, 0.0f, 0.0f, 1.0f}), vk::ClearDepthStencilValue(1.0f, 0.0f)
     };
-    const int MAX_FRAMES_IN_FLIGHT = 2;  // TODO: restore 2
+    const int MAX_FRAMES_IN_FLIGHT = 2;
+
 
     bool b_use_validation_layers = false;
     Window& m_window_ref;
@@ -43,7 +44,8 @@ private:
     vk::Queue m_compute_queue;
     VkSwapchainInfo m_swapchain_info;
     std::vector<vk::Framebuffer> m_frame_buffers;
-    uint32_t current_frame = 0;
+    uint32_t m_current_frame = 0;
+    vk::SampleCountFlagBits m_msaa_samples = vk::SampleCountFlagBits::e1;
 
     // for pipeline
     vk::Image m_color_image;
@@ -56,7 +58,7 @@ private:
     std::vector<vk::Semaphore> m_swapchain_image_available;
     std::vector<vk::Semaphore> m_render_finished;
     std::vector<vk::Fence> m_in_flight;
-    bool frame_resized = false;
+    bool m_frame_resized = false;
 
     // example pipeline
     vk::Pipeline m_example_pipeline;
@@ -104,6 +106,7 @@ private:
     auto physical_device_is_suitable(vk::PhysicalDevice physical_device) -> bool;
     auto get_queue_families(vk::PhysicalDevice physical_device) -> VkQueueFamilyIndices;
     auto check_extensions_support(vk::PhysicalDevice physical_device) -> bool;
+    auto get_sample_count() -> vk::SampleCountFlagBits;
 
     auto create_logical_device(vk::PhysicalDevice physical_device) -> vk::Device;
 
@@ -168,6 +171,7 @@ private:
     void update_uniform_buffer(uint32_t image_index);
     void populate_example_desc_sets();
     void create_example_texture();
+    void draw_example_frame();
 
     void create_color_resources(
         const VkSwapchainInfo& swapchain,
