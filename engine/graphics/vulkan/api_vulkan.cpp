@@ -126,6 +126,11 @@ void fill_debug_utils_messenger_create_info(vk::DebugUtilsMessengerCreateInfoEXT
     messenger_info.pUserData = nullptr;
 }
 
+static void framebuffer_resize_callback(GLFWwindow* window, int width, int height)
+{
+    auto renderer = reinterpret_cast<bomb_engine::APIVulkan*>(glfwGetWindowUserPointer(window));
+    renderer->framebuffer_resized();
+}
 #pragma endregion vulkan instance helpers
 
 namespace BE_NAMESPACE
@@ -135,14 +140,20 @@ APIVulkan::APIVulkan(Window& window, bool enable_validation_layers)
 {
     create_instance(window, enable_validation_layers);
     create_surface(window, m_surface);
+
+    glfwSetWindowUserPointer(window.get_raw_window(), this);
+    glfwSetFramebufferSizeCallback(window.get_raw_window(), framebuffer_resize_callback);
+
     m_physical_device = select_physical_device();
     m_msaa_samples = get_sample_count();
     m_device = create_logical_device(m_physical_device);
+
     auto families = get_queue_families(m_physical_device);
     m_graphics_queue = m_device.getQueue(families.graphics.value(), 0);
     m_present_queue = m_device.getQueue(families.present.value(), 0);
     m_transfer_queue = m_device.getQueue(families.transfer.value(), 0);
     m_compute_queue = m_device.getQueue(families.compute.value(), 0);
+
     m_swapchain_info = create_swapchain(m_physical_device, m_surface, m_device);
 
     // example pipeline related (we will create a sample scene rendered directly
@@ -1371,14 +1382,23 @@ void APIVulkan::draw_example_frame()
         m_in_flight[m_current_frame]
     );
 
+    // TODO: remove exceptions and deal with error out of date assertion.
     try
     {
         auto present_result = m_present_queue.presentKHR(vk::PresentInfoKHR(
             m_render_finished[m_current_frame], m_swapchain_info.swapchain, image_index
         ));
+        if (present_result == vk::Result::eSuboptimalKHR || m_frame_resized)
+        {
+            m_frame_resized = false;
+            std::tie(m_swapchain_info, m_frame_buffers) = recreate_swapchain_and_framebuffers(
+                m_physical_device, m_surface, m_device, nullptr, m_example_renderpass
+            );
+        }
     }
-    catch (const vk::OutOfDateKHRError&)  // handle resize
+    catch (const vk::OutOfDateKHRError)
     {
+        m_frame_resized = false;
         std::tie(m_swapchain_info, m_frame_buffers) = recreate_swapchain_and_framebuffers(
             m_physical_device, m_surface, m_device, nullptr, m_example_renderpass
         );
@@ -1665,6 +1685,13 @@ auto APIVulkan::recreate_swapchain_and_framebuffers(
     vk::RenderPass render_pass
 ) -> std::tuple<VkSwapchainInfo, std::vector<vk::Framebuffer>>
 {
+    int width = 0, height = 0;
+    glfwGetFramebufferSize(m_window_ref.get_raw_window(), &width, &height);
+    while (width == 0 && height == 0)
+    {
+        glfwGetFramebufferSize(m_window_ref.get_raw_window(), &width, &height);
+        glfwWaitEvents();
+    }
     m_device.waitIdle();
     cleanup_swapchain(m_swapchain_info);
     auto swapchain_info = create_swapchain(physical_device, surface, device, nullptr);

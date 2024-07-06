@@ -15,6 +15,7 @@ public:
     ~APIVulkan() override;
 
     inline auto get_api() -> E_API override { return E_API::API_VULKAN; }
+    inline void framebuffer_resized() { m_frame_resized = true; }
 
     // testing only, I need a starting point to work from, which in this case is a model drawn to
     // the surface
@@ -30,7 +31,6 @@ private:
         vk::ClearColorValue({0.0f, 0.0f, 0.0f, 1.0f}), vk::ClearDepthStencilValue(1.0f, 0.0f)
     };
     const int MAX_FRAMES_IN_FLIGHT = 2;
-
 
     bool b_use_validation_layers = false;
     Window& m_window_ref;
@@ -157,8 +157,11 @@ private:
         uint32_t mips
     );
     void copy_buffer_to_image(vk::Buffer, vk::Image image, uint32_t width, uint32_t height);
-    auto create_image_sampler(vk::Filter filter, vk::SamplerAddressMode address_mode) -> vk::Sampler;
-    void generate_mipmaps(vk::Image image, vk::Format format, uint32_t width, uint32_t height, uint32_t mips);
+    auto create_image_sampler(vk::Filter filter, vk::SamplerAddressMode address_mode)
+        -> vk::Sampler;
+    void generate_mipmaps(
+        vk::Image image, vk::Format format, uint32_t width, uint32_t height, uint32_t mips
+    );
 
     // these are required to get ourselves to draw something in the editor in order to have easier
     // refactoring and feature introduction
