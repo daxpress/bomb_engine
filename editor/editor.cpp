@@ -23,12 +23,13 @@ auto main() -> int
     auto some = Some();
 
     bomb_engine::Dispatcher<int, bool> dispatcher;
-    dispatcher._add_listener([](int, bool) {}, "somelambda");
-    dispatcher._add_listener(::test, "::test");
-    dispatcher._add_listener(&Some::some, "&Some::some", &some);
+    dispatcher.add_listener([](int, bool) {});
+    dispatcher.add_listener(::test);
+    dispatcher.add_listener(&Some::some,  &some);
     dispatcher(1, true);
+    dispatcher.remove_listener(&Some::some, &some);
     dispatcher.remove_listener(::test);
-
+    dispatcher.broadcast(2, false);
     app.start();
 
     // we will need ways to configure the app to be used as an editor...

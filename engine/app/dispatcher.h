@@ -1,7 +1,6 @@
 #pragma once
 
 #include <type_traits>
-// namespace std
 
 namespace BE_NAMESPACE
 {
@@ -9,43 +8,89 @@ namespace BE_NAMESPACE
 template <typename... Args>
 class Dispatcher
 {
+private:
     using internal_fn = std::function<void(Args...)>;
     using listeners_map_t = std::unordered_map<size_t, internal_fn>;
 
-public:
-    inline void _add_listener(internal_fn&& listener, const std::string&& func_name)
-    {
-        listeners.emplace(std::hash<std::string>{}(func_name), listener);
-    }
-
-    inline void _remove_listener(const std::string&& func_name)
-    {
-        listeners.erase(std::hash<std::string>{}(func_name));
-    }
+    // uuid generation overloads for the method
 
     template <typename Callable, typename Context>
         requires std::is_member_function_pointer_v<Callable>
-    inline void _add_listener(
-        Callable callable, const std::string&& func_name, Context* context = nullptr
-    )
+    static auto generate_key(Callable callable, Context* context) -> size_t
     {
-        auto func = [context, callable](Args... args) { (context->*callable)(args...); };
-        _add_listener(func, std::move(func_name));
+        // Combine the hash of the object pointer with the hash of the callable
+        // this allows to have same methods for different objects in the same dispatcher
+        return std::hash<Context*>()(context) ^ typeid(callable).hash_code();
     }
 
-    void operator()(Args&&... args)
+    // uuid generation overloads for the function
+
+    template <typename Callable>
+        requires !std::is_member_function_pointer_v<Callable>
+                  static auto generate_key(Callable callable)->size_t
+    {
+        // it doesn't make sense to put the same free function twice in a dispatcher so this is fine
+        // to me
+        return typeid(callable).hash_code();
+    }
+
+    // common method for placing the listener in the map
+    inline void place_listener(const size_t key, internal_fn&& fn)
+    {
+        listeners.emplace(key, std::move(fn));
+    }
+
+public:
+    // add_listener overloads for functions and methods and restrict compilation using requirements
+    template <typename Callable>
+        requires !std::is_member_function_pointer_v<Callable>
+                 inline void add_listener(Callable && listener)
+    {
+        place_listener(generate_key(listener), std::forward<Callable>(listener));
+    }
+
+    // only compiled when Callable is a member function (method)
+
+    template <typename Callable, typename Context>
+        requires std::is_member_function_pointer_v<Callable>
+    inline void add_listener(Callable callable, Context* context)
+    {
+        auto uuid = generate_key<Callable, Context>(callable, context);
+        auto func = [context, callable](Args... args) { (context->*callable)(args...); };
+        place_listener(uuid, func);
+    }
+
+    // method removal
+
+    template <typename Callable, typename Context>
+        requires std::is_member_function_pointer_v<Callable>
+    inline void remove_listener(Callable callable, Context* context)
+    {
+        listeners.erase(generate_key<Callable, Context>(callable, context));
+    }
+
+    template <typename Callable>
+        requires !std::is_member_function_pointer_v<Callable>
+                 inline void remove_listener(Callable callable)
+    {
+        listeners.erase(generate_key(callable));
+    }
+
+    // dispatch
+
+    inline void operator()(Args&&... args) { broadcast(std::forward<Args>(args)...); }
+
+    // for those who prefer explicitness
+
+    inline void broadcast(Args&&... args)
     {
         for (const auto& [key, listener] : listeners)
         {
             listener(args...);
-        }
+        };
     }
 
 private:
     listeners_map_t listeners{};
 };
 }  // namespace BE_NAMESPACE
-
-#define add_listener(listener, context) \
-    _add_listener<decltype(listener), decltype(context)>(listener, #listener, context)
-#define remove_listener(listener) _remove_listener(#listener)
