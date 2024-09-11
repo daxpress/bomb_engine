@@ -33,5 +33,6 @@ struct __Scriptable : entt::type_list<>
 
 // at this point use entt::poly to wrap the compatible classes; this will be the class used to add
 // the component
+
 using Scriptable = entt::poly<__Scriptable>;
 }  // namespace BE_NAMESPACE

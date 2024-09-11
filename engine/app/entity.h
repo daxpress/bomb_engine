@@ -8,9 +8,9 @@ namespace BE_NAMESPACE
 // small wrapper to allow easier entity allocation and management for users
 class Entity
 {
-   public:
+public:
     explicit Entity(Scene& scene);
-    ~Entity();
+    ~Entity() = default;
 
     template <typename Component, typename... Args>
     auto add_component(Args&&... args) -> Component
@@ -24,15 +24,18 @@ class Entity
         m_scene_ref.m_registry.remove<Component>(m_entity);
     }
 
-    template <typename Component>
-    auto get_component() -> Component
+    template <typename... Components>
+    auto get_component()
     {
-        return m_scene_ref.m_registry.try_get<Component>();
+        return m_scene_ref.m_registry.try_get<Components...>();
     }
+
+    // not explicit to facilitate some operations
+    operator entt::entity() const { return m_entity; }
 
     friend class Scene;
 
-   private:
+private:
     entt::entity m_entity;
     Scene& m_scene_ref;
 };

@@ -27,4 +27,6 @@ void Scene::update(float tick)
 }
 
 auto Scene::spawn_entity() -> Entity { return Entity(*this); }
+void Scene::destroy_entity(Entity entity) { m_registry.destroy(entity); }
+
 }  // namespace BE_NAMESPACE

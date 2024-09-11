@@ -11,6 +11,7 @@ CTestTestfile.cmake
 _deps
 CMakeUserPresets.json
 Directory.build.props
+cmake-build-debug/
 
 # Prerequisites
 *.d
@@ -49,6 +50,7 @@ out/
 build/
 .vs/
 .vscode/
+.idea/
 
 # Generated code
 *generated/
