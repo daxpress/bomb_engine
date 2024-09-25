@@ -9,32 +9,21 @@ constexpr bool debug = true;
 constexpr bool debug = false;
 #endif
 
-void test(int, bool) { std::cout << "Test!" << std::endl; }
-
-struct Some
-{
-    void some(int, bool) { std::cout << "Some!" << std::endl; };
-};
+MakeCategory(Editor, LogSeverity::Display);
 
 auto main() -> int
 {
     auto app = bomb_engine::App(debug);
-
-    auto some = Some();
-
-    bomb_engine::Dispatcher<int, bool> dispatcher;
-    dispatcher.add_listener([](int, bool) {});
-    dispatcher.add_listener(::test);
-    dispatcher.add_listener(&Some::some,  &some);
-    dispatcher(1, true);
-    dispatcher.remove_listener(&Some::some, &some);
-    dispatcher.remove_listener(::test);
-    dispatcher.broadcast(2, false);
     app.start();
 
     // we will need ways to configure the app to be used as an editor...
     // right now it's just fine to use sample code to get major functionality going.
     // (no point in building an editor for an engine that doesn't exist yet)
+    Log(EditorCategory, LogSeverity::Display, "This is Display");
+    Log(EditorCategory, LogSeverity::Log, "This is Log");
+    Log(EditorCategory, LogSeverity::Warning, "This is Warning");
+    Log(EditorCategory, LogSeverity::Error, "This is Error");
+    Log(EditorCategory, LogSeverity::Fatal, "This is Fatal");
 
     app.loop();
 

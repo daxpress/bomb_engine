@@ -46,7 +46,7 @@ macro(add_target_subdirectory target_module access_specifier)
 endmacro()
 
 # adds a new engine module as a linked library, to be called from owner of the module.
-# most of the time target_module = bomb_engine_engine, but it might be usefull to have some 
+# most of the time target_module = bomb_engine_engine, but it might be useful to have some
 # linking to other libraries instead
 function (add_engine_submodule target_module module_folder)
 	add_subdirectory(${module_folder})
@@ -66,8 +66,11 @@ function(new_engine_module module_name library_type)
 		PUBLIC
 		${CMAKE_CURRENT_SOURCE_DIR}
 	)
+#
+#	# link to tools
+	target_link_libraries(${module_name} bomb_engine_tools)
 
-	# set dependancy to header_tool to allow generated code to compile
+	# set dependency to header_tool to allow generated code to compile
 	add_dependencies(${module_name} header_tool)
 
 	set_property(GLOBAL APPEND PROPERTY header_tool_targets ${module_name})
@@ -91,7 +94,7 @@ function(new_engine_module module_name library_type)
 endfunction()
 
 function(new_engine_plugin plugin_name library_type)
-	# it essentally does the same thing as the new_engine_module function, but it doesn't
+	# it essentially does the same thing as the new_engine_module function, but it doesn't
 	# require to be added to the engine with add_engine_submodule as a plugin is, by definition, optional.
 	# It also does not declare a custom precompiled header by default.
 	message(STATUS "adding plugin: ${plugin_name}")
@@ -104,7 +107,7 @@ function(new_engine_plugin plugin_name library_type)
 		${CMAKE_CURRENT_SOURCE_DIR}
 	)
 
-	# set dependancy to header_tool to allow generated code to compile
+	# set dependency to header_tool to allow generated code to compile
 	add_dependencies(${plugin_name} header_tool)
 
 	set_property(GLOBAL APPEND PROPERTY header_tool_targets ${plugin_name})
@@ -126,6 +129,13 @@ macro(get_engine_headers out_headers out_libs)
 	get_target_property(__linked_libs bomb_engine_engine LINK_LIBRARIES)
 	list(APPEND ${out_libs} ${__linked_libs})
 	foreach(lib ${__linked_libs})
+		# check if it is an engine module (starts with "bomb_engine")
+		set(__engine_target)
+		string(FIND ${lib} "bomb_engine" __engine_target)
+		if (__engine_target LESS 0)
+			# not an engine module, we don't care about it
+			continue()
+		endif ()
 		get_target_property(__headers ${lib} HEADER_SET_HEADERS)
 		list(APPEND ${out_headers} ${__headers})
 		endforeach()

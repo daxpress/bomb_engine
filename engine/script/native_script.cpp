@@ -1,10 +1,12 @@
 #include "native_script.h"
 
+#include "log.h"
+
 namespace BE_NAMESPACE
 {
 	void NativeScript::start()
 	{
-		std::cout << "Starting native script!" << std::endl;
+		Log(LogTempCategory, LogSeverity::Log, "Starting Script");
 	}
 	void NativeScript::update(float tick)
 	{
