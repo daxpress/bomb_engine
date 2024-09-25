@@ -6,6 +6,8 @@
 #include "vulkan/api_vulkan_structs.h"
 #include "window.h"
 
+MakeCategory(VulkanAPI);
+
 namespace BE_NAMESPACE
 {
 class APIVulkan : public IAPI

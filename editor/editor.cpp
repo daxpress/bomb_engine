@@ -9,7 +9,7 @@ constexpr bool debug = true;
 constexpr bool debug = false;
 #endif
 
-MakeCategory(Editor, LogSeverity::Display);
+MakeCategory(Editor);
 
 auto main() -> int
 {
@@ -23,7 +23,7 @@ auto main() -> int
     Log(EditorCategory, LogSeverity::Log, "This is Log");
     Log(EditorCategory, LogSeverity::Warning, "This is Warning");
     Log(EditorCategory, LogSeverity::Error, "This is Error");
-    Log(EditorCategory, LogSeverity::Fatal, "This is Fatal");
+    //Log(EditorCategory, LogSeverity::Fatal, "This is Fatal");
 
     app.loop();
 

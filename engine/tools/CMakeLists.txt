@@ -7,13 +7,14 @@ add_dependencies(bomb_engine_tools header_tool)
 
 set_property(GLOBAL APPEND PROPERTY header_tool_targets bomb_engine_tools)
 
-target_sources( bomb_engine_tools
+target_sources(bomb_engine_tools
         PUBLIC
         FILE_SET HEADERS FILES
         "log.h"
         PRIVATE
-        "../macros.h" "log.cpp"
+        "log.cpp"
 )
+
 target_include_directories(bomb_engine_tools
         PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}

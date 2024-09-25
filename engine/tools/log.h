@@ -13,6 +13,13 @@
 #include <string>
 #include <unordered_map>
 
+#pragma region Log Helper Classes
+
+// * Display only prints the output to terminal
+// * Log prints to terminal and to a log file
+// * Warning prints to both terminal and file
+// * Error prints to both terminal and file, adding file, line and column info
+// * Fatal behaves like Error but crashes the session as well
 enum class LogSeverity : uint8_t
 {
     Display = 0,
@@ -27,7 +34,7 @@ class LogCategory
 {
 public:
     explicit LogCategory(
-        const std::string&& category_name, LogSeverity severity = LogSeverity::Log
+        const std::string&& category_name, LogSeverity severity = LogSeverity::Display
     );
 
     [[nodiscard]] auto can_log(LogSeverity severity) const -> bool;
@@ -42,6 +49,59 @@ public:
 #define MakeCategory(Name, ...) \
     inline static LogCategory Name##Category = LogCategory(#Name, __VA_ARGS__)
 
+#pragma endregion
+
+#pragma region Log Devices
+namespace bomb_engine
+{
+// Interface to use for outputting to custom devices (remote terminals, viewports etc...)
+class ILogDevice
+{
+public:
+    virtual ~ILogDevice() = default;
+    virtual void print_message(
+        LogSeverity severity,
+        const std::string& category,
+        const std::string& location,
+        const std::string& message
+    ) = 0;
+};
+
+}  // namespace bomb_engine
+
+class DefaultTerminalDevice final : public bomb_engine::ILogDevice
+{
+public:
+    void print_message(
+        LogSeverity severity,
+        const std::string& category,
+        const std::string& location,
+        const std::string& message
+    ) override;
+
+private:
+    inline const static std::unordered_map<LogSeverity, fmt::color> colors{
+        {LogSeverity::Display, fmt::color::light_steel_blue},
+        {LogSeverity::Log, fmt::color::light_gray},
+        {LogSeverity::Warning, fmt::color::gold},
+        {LogSeverity::Error, fmt::color::orange_red},
+        {LogSeverity::Fatal, fmt::color::crimson},
+    };
+};
+
+class DefaultFileDevice final : public bomb_engine::ILogDevice
+{
+public:
+    void print_message(
+        LogSeverity severity,
+        const std::string& category,
+        const std::string& location,
+        const std::string& message
+    ) override;
+};
+
+#pragma endregion
+
 template <typename... Args>
 class Log
 {
@@ -55,6 +115,18 @@ public:
         log(category, severity, location, message, args...);
     }
 
+    // use this function to add a new device in the output devices list
+    static void add_device(std::shared_ptr<bomb_engine::ILogDevice> device)
+    {
+        devices.emplace_back(device);
+    }
+
+    // use this function to remove a new device in the output devices list
+    static void remove_device(std::shared_ptr<bomb_engine::ILogDevice> device)
+    {
+        std::erase(devices, device);
+    }
+
 private:
     static void log(
         const LogCategory& category,
@@ -64,35 +136,38 @@ private:
         Args... args
     )
     {
+        // check if category accepts this severity
         if (!category.can_log(severity)) return;
 
-        // always present
-        const auto cat = get_category_format(category, severity);
-        // might be empty, depending on the category
+        // gather the formatted pieces for the message
+        const auto cat = get_category_format(category);
         const auto loc = get_location_format(location, severity);
-        // the actual message...
-        const auto msg = get_message_format(message, severity, args...);
-        // print the final result (we must do this section formatting sequence because somehow it
-        // didn't format the whole concatenated sequence)
-        fmt::print(fmt::runtime(cat + loc + msg + "\n"), args...);
+        const auto msg = get_message_format(message, args...);
+
+        // print using the available devices
+        std::for_each(
+            devices.begin(),
+            devices.end(),
+            [&](const std::shared_ptr<bomb_engine::ILogDevice>& device)
+            // pass the pieces to the devices in the list, they will handle them as needed
+            { device->print_message(severity, cat, loc, msg + "\n"); }
+        );
+
+        // lastly crash if severity is FATAL
+        if (severity == LogSeverity::Fatal) std::terminate();
     }
 
     inline static auto get_message_format(
-        const std::string& message, const LogSeverity severity, Args... args
+        const std::string& message, Args... args
     ) -> std::string
     {
-        return fmt::format(
-            fmt::fg(colors[severity]), fmt::runtime( ": " + message), args...
-        );
+        return fmt::format(fmt::runtime(": " + message), args...);
     }
 
-    inline static auto get_category_format(const LogCategory& category, const LogSeverity severity)
+    inline static auto get_category_format(const LogCategory& category)
         -> std::string
     {
-        return fmt::format(
-            fmt::emphasis::bold | fmt::fg(colors[severity]),
-            fmt::runtime("[" + category.category_name + "]")
-        );
+        return fmt::format(fmt::runtime("[" + category.category_name + "]"));
     };
 
     inline static auto get_location_format(
@@ -103,20 +178,14 @@ private:
         if (severity <= LogSeverity::Warning) return "";
 
         return fmt::format(
-            fmt::emphasis::bold | fmt::fg(colors[severity]),
-            " [{}({},{})]",
-            location.file_name(),
-            location.line(),
-            location.column()
+            " [{}({},{})]", location.file_name(), location.line(), location.column()
         );
     }
 
-    inline static std::unordered_map<LogSeverity, fmt::color> colors{
-        {LogSeverity::Display, fmt::color::light_steel_blue},
-        {LogSeverity::Log, fmt::color::light_gray},
-        {LogSeverity::Warning, fmt::color::gold},
-        {LogSeverity::Error, fmt::color::orange_red},
-        {LogSeverity::Fatal, fmt::color::crimson},
+private:
+    // initialize with default devices
+    inline static std::vector<std::shared_ptr<bomb_engine::ILogDevice>> devices{
+        std::make_shared<DefaultTerminalDevice>(), std::make_shared<DefaultFileDevice>()
     };
 };
 template <typename... Args>

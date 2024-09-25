@@ -107,7 +107,17 @@ VKAPI_ATTR auto VKAPI_CALL debug_callback(
     void* pUserData
 ) -> VkBool32
 {
-    std::cerr << "validation layer: " << pCallbackData->pMessage << "\n";
+    auto severity = LogSeverity::Log;
+    if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+    {
+        severity = LogSeverity::Warning;
+    }
+    if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+    {
+        severity = LogSeverity::Error;
+    }
+
+    Log(VulkanAPICategory, severity, "validation layer: {}", pCallbackData->pMessage);
     return VK_FALSE;
 }
 
@@ -344,9 +354,10 @@ auto APIVulkan::select_physical_device() -> vk::PhysicalDevice
         throw std::runtime_error("failed to find a supported GPU!");
     }
 
-    // TODO: use logging macro instead
-    std::cout << "Picked Device: " << device_ratings.begin()->second.getProperties().deviceName
-              << "\n";
+    Log(VulkanAPICategory,
+        LogSeverity::Log,
+        "Picked Device: {:s}",
+        device_ratings.begin()->second.getProperties().deviceName);
 
     return device_ratings.begin()->second;
 }
@@ -598,8 +609,8 @@ auto APIVulkan::create_swapchain(
     return swapchain_info;
 }
 
-auto APIVulkan::choose_swapchain_surface_format(std::vector<vk::SurfaceFormatKHR> formats
-) -> vk::SurfaceFormatKHR
+auto APIVulkan::choose_swapchain_surface_format(std::vector<vk::SurfaceFormatKHR> formats)
+    -> vk::SurfaceFormatKHR
 {
     for (const auto& format : formats)
     {
@@ -612,8 +623,8 @@ auto APIVulkan::choose_swapchain_surface_format(std::vector<vk::SurfaceFormatKHR
     return formats[0];
 }
 
-auto APIVulkan::choose_swapchain_present_mode(const std::vector<vk::PresentModeKHR>& present_modes
-) -> vk::PresentModeKHR
+auto APIVulkan::choose_swapchain_present_mode(const std::vector<vk::PresentModeKHR>& present_modes)
+    -> vk::PresentModeKHR
 {
     for (const auto& present_mode : present_modes)
     {
@@ -758,8 +769,7 @@ void APIVulkan::transition_image_layout(
         src_stage = vk::PipelineStageFlagBits::eTopOfPipe;
         dst_stage = vk::PipelineStageFlagBits::eTransfer;
     }
-    else if (old_layout == vk::ImageLayout::eUndefined &&
-             new_layout == vk::ImageLayout::eShaderReadOnlyOptimal)
+    else if (old_layout == vk::ImageLayout::eUndefined && new_layout == vk::ImageLayout::eShaderReadOnlyOptimal)
     {
         barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
         barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
@@ -767,8 +777,7 @@ void APIVulkan::transition_image_layout(
         src_stage = vk::PipelineStageFlagBits::eTransfer;
         dst_stage = vk::PipelineStageFlagBits::eFragmentShader;
     }
-    else if (old_layout == vk::ImageLayout::eUndefined &&
-             new_layout == vk::ImageLayout::eDepthStencilAttachmentOptimal)
+    else if (old_layout == vk::ImageLayout::eUndefined && new_layout == vk::ImageLayout::eDepthStencilAttachmentOptimal)
     {
         barrier.srcAccessMask = vk::AccessFlagBits::eNone;
         barrier.dstAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentRead |

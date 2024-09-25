@@ -10,7 +10,6 @@ namespace BE_NAMESPACE
 	}
 	void NativeScript::update(float tick)
 	{
-		// sample update
-		// std::cout << "delta time is: " << tick << std::endl;
+
 	}
 }
