@@ -15,9 +15,10 @@
 
 #pragma region Log Helper Classes
 
+// By default:
 // * Display only prints the output to terminal
 // * Log prints to terminal and to a log file
-// * Warning prints to both terminal and file
+// * Warning prints to terminal and to a log file
 // * Error prints to both terminal and file, adding file, line and column info
 // * Fatal behaves like Error but crashes the session as well
 enum class LogSeverity : uint8_t
@@ -98,10 +99,30 @@ public:
         const std::string& location,
         const std::string& message
     ) override;
+
+private:
+    // static: it will compose the log path at the beginning of the session, it will remain the same
+    // throughout it.
+
+    // make log directory
+    inline static auto timepoint =
+        std::chrono::zoned_time(std::chrono::current_zone(), std::chrono::system_clock::now())
+            .get_local_time();
+    inline static auto log_dir =
+        std::filesystem::path(std::filesystem::current_path().string() + "/logs").make_preferred();
+    // make log path
+    inline static auto log_path =
+        std::filesystem::path(
+            fmt::format(fmt::runtime("{}/log_{:%F_%H.%M}.txt"), log_dir, timepoint)
+        )
+            // convert the separators to the system ones
+            .make_preferred();
 };
 
 #pragma endregion
 
+// refer to https://fmt.dev/latest/syntax/#chrono-format-specifications for the formatting
+// specifications
 template <typename... Args>
 class Log
 {
@@ -157,15 +178,12 @@ private:
         if (severity == LogSeverity::Fatal) std::terminate();
     }
 
-    inline static auto get_message_format(
-        const std::string& message, Args... args
-    ) -> std::string
+    inline static auto get_message_format(const std::string& message, Args... args) -> std::string
     {
         return fmt::format(fmt::runtime(": " + message), args...);
     }
 
-    inline static auto get_category_format(const LogCategory& category)
-        -> std::string
+    inline static auto get_category_format(const LogCategory& category) -> std::string
     {
         return fmt::format(fmt::runtime("[" + category.category_name + "]"));
     };

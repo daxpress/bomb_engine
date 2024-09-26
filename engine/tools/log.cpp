@@ -1,5 +1,10 @@
 #include "log.h"
 
+#include <fstream>
+#include <mutex>
+#include <syncstream>
+#include <thread>
+
 LogCategory::LogCategory(const std::string&& category_name, const LogSeverity severity)
     : category_name(category_name), severity(severity)
 {
@@ -34,6 +39,18 @@ void DefaultFileDevice::print_message(
     const std::string& message
 )
 {
-    if (severity <= LogSeverity::Log) return;
-    // to be implemented...
+    if (severity < LogSeverity::Log) return;
+    // make dir if not present
+    std::filesystem::create_directory(log_dir);
+    // open fstream
+    auto log_file = std::ofstream(log_path, std::ios::app);
+    if (!log_file.is_open()) return;
+
+    // // wrap with osyncstream to ensure it is thread safe
+    auto sync_stream = std::osyncstream(log_file);
+    // get the current timestamp for additional info in the log
+    const auto time =
+        std::chrono::zoned_time(std::chrono::current_zone(), std::chrono::system_clock::now())
+            .get_local_time();
+    fmt::print(sync_stream, fmt::runtime("[{}]: {}{}{}"), time, category, location, message);
 }
