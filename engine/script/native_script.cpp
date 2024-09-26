@@ -1,15 +1,9 @@
 #include "native_script.h"
 
-#include "log.h"
+#include "internal.h"
 
 namespace BE_NAMESPACE
 {
-	void NativeScript::start()
-	{
-		Log(LogTempCategory, LogSeverity::Log, "Starting Script");
-	}
-	void NativeScript::update(float tick)
-	{
-
-	}
-}
+void NativeScript::start() { Log(ScriptCategory, LogSeverity::Display, "Starting Script"); }
+void NativeScript::update(float tick) {}
+}  // namespace BE_NAMESPACE

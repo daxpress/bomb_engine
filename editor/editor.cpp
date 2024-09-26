@@ -20,10 +20,6 @@ auto main() -> int
     // right now it's just fine to use sample code to get major functionality going.
     // (no point in building an editor for an engine that doesn't exist yet)
     Log(EditorCategory, LogSeverity::Display, "This is Display");
-    Log(EditorCategory, LogSeverity::Log, "This is Log");
-    Log(EditorCategory, LogSeverity::Warning, "This is Warning");
-    Log(EditorCategory, LogSeverity::Error, "This is Error");
-    //Log(EditorCategory, LogSeverity::Fatal, "This is Fatal");
 
     app.loop();
 

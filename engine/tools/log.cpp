@@ -16,7 +16,7 @@ auto LogCategory::can_log(const LogSeverity severity) const -> bool
 }
 
 void DefaultTerminalDevice::print_message(
-    LogSeverity severity,
+    const LogSeverity severity,
     const std::string& category,
     const std::string& location,
     const std::string& message
@@ -32,8 +32,31 @@ void DefaultTerminalDevice::print_message(
     fmt::print(out, fmt::runtime(cat + loc + msg));
 }
 
+static auto get_log_type_string(const LogSeverity severity) -> std::string
+{
+    switch (severity)
+    {
+        case LogSeverity::Display:
+            return "Display";
+            break;
+        case LogSeverity::Log:
+            return "Log";
+            break;
+        case LogSeverity::Warning:
+            return "Warning";
+            break;
+        case LogSeverity::Error:
+            return "Error";
+            break;
+        case LogSeverity::Fatal:
+            return "Fatal";
+            break;
+    }
+    return "";
+}
+
 void DefaultFileDevice::print_message(
-    LogSeverity severity,
+    const LogSeverity severity,
     const std::string& category,
     const std::string& location,
     const std::string& message
@@ -48,9 +71,12 @@ void DefaultFileDevice::print_message(
 
     // // wrap with osyncstream to ensure it is thread safe
     auto sync_stream = std::osyncstream(log_file);
+    const auto log_type = get_log_type_string(severity);
     // get the current timestamp for additional info in the log
     const auto time =
         std::chrono::zoned_time(std::chrono::current_zone(), std::chrono::system_clock::now())
             .get_local_time();
-    fmt::print(sync_stream, fmt::runtime("[{}]: {}{}{}"), time, category, location, message);
+    fmt::print(
+        sync_stream, fmt::runtime("[{}] - {} [{}]{}{}"), time, category, log_type, location, message
+    );
 }
