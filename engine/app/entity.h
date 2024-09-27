@@ -31,7 +31,7 @@ public:
     }
 
     // not explicit to facilitate some operations
-    operator entt::entity() const { return m_entity; }
+    operator entt::entity() const { return m_entity; } // NOLINT(*-explicit-constructor)
 
     friend class Scene;
 

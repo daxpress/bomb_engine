@@ -10,9 +10,9 @@ set_property(GLOBAL APPEND PROPERTY header_tool_targets bomb_engine_tools)
 target_sources(bomb_engine_tools
         PUBLIC
         FILE_SET HEADERS FILES
-        "log.h"
+        "log.h" "dispatcher.h"
         PRIVATE
-        "log.cpp"
+        "log.cpp" "dispatcher.cpp"
 )
 
 target_include_directories(bomb_engine_tools

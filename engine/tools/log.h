@@ -40,8 +40,8 @@ public:
 
     [[nodiscard]] auto can_log(LogSeverity severity) const -> bool;
 
-    const std::string category_name;
-    const LogSeverity severity;
+    const std::string m_category_name;
+    const LogSeverity m_severity;
     // right now it doesn't really have much info in it...
 };
 
@@ -185,7 +185,7 @@ private:
 
     inline static auto get_category_format(const LogCategory& category) -> std::string
     {
-        return fmt::format(fmt::runtime("[" + category.category_name + "]"));
+        return fmt::format(fmt::runtime("[" + category.m_category_name + "]"));
     };
 
     inline static auto get_location_format(

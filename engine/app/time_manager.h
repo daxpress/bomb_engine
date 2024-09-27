@@ -16,11 +16,11 @@ private:
     friend class App;
 
     void start();
-    auto tick() -> float;
+    inline auto tick() -> float;
 
 public:
-    auto delta_time() -> float;
-    auto since_start() -> float;
+    [[nodiscard]] inline auto delta_time() const -> float;
+    [[nodiscard]] inline auto since_start() const -> float;
 
 private:
     // should also include timers and delays
@@ -29,6 +29,6 @@ private:
     std::chrono::steady_clock::time_point m_current_time;
 
     // caching delta_time in duration to enable duration_casts
-    std::chrono::duration<float, std::chrono::seconds::period> m_delta_time;
+    std::chrono::duration<float, std::chrono::seconds::period> m_delta_time{};
 };
 }  // namespace BE_NAMESPACE

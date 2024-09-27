@@ -1,3 +1,5 @@
+#pragma once
+
 #include "renderer.h"
 #include "scene.h"
 #include "time_manager.h"

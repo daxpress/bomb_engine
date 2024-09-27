@@ -10,7 +10,7 @@ void TimeManager::start()
 auto TimeManager::tick() -> float
 {
     // get last frame time
-    auto last_tick = m_current_time;
+    const auto last_tick = m_current_time;
     // update frame time to current
     m_current_time = std::chrono::high_resolution_clock::now();
     // get the difference in secs
@@ -19,8 +19,8 @@ auto TimeManager::tick() -> float
 
     return delta_time();
 }
-auto TimeManager::delta_time() -> float { return m_delta_time.count(); }
-auto TimeManager::since_start() -> float
+auto TimeManager::delta_time() const -> float { return m_delta_time.count(); }
+auto TimeManager::since_start() const -> float
 {
     return std::chrono::duration<float, std::chrono::seconds::period>(m_current_time - m_start_time)
         .count();

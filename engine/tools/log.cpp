@@ -6,13 +6,13 @@
 #include <thread>
 
 LogCategory::LogCategory(const std::string&& category_name, const LogSeverity severity)
-    : category_name(category_name), severity(severity)
+    : m_category_name(category_name), m_severity(severity)
 {
 }
 
 auto LogCategory::can_log(const LogSeverity severity) const -> bool
 {
-    return this->severity <= severity;
+    return m_severity <= severity;
 }
 
 void DefaultTerminalDevice::print_message(
