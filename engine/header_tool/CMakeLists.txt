@@ -4,6 +4,7 @@ set(ht_targets_)
 get_header_tool_targets(ht_targets_)
 
 set(generated_dir "${CMAKE_CURRENT_BINARY_DIR}/generated")
+set_property(GLOBAL PROPERTY header_tool_products_dir ${generated_dir})
 
 # this step isn't that necessary because cargo run will also compile if it detects changes,
 # but i keep it anyway so I remember how to do it with other exes

@@ -157,6 +157,7 @@ endmacro()
 # ====================================== GLOBAL VARIABLES =====================================
 
 set_property(GLOBAL PROPERTY header_tool_targets)
+set_property(GLOBAL PROPERTY header_tool_products_dir)
 
 # =================================== ENGINE SUBDIRECTORIES ===================================
 

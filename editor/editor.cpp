@@ -2,6 +2,7 @@
 // right now it acts more like a sandbox to put everything together and test the functionalities.
 
 #include "app/app.h"
+#include "pybomb.h"
 
 #ifdef _DEBUG
 constexpr bool debug = true;
@@ -15,6 +16,8 @@ auto main() -> int
 {
     auto app = bomb_engine::App(debug);
     app.start();
+
+    auto& py = get_interpreter();
 
     // we will need ways to configure the app to be used as an editor...
     // right now it's just fine to use sample code to get major functionality going.

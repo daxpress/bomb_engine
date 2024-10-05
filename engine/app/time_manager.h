@@ -16,7 +16,7 @@ private:
     friend class App;
 
     void start();
-    inline auto tick() -> float;
+    auto tick() -> float;
 
 public:
     [[nodiscard]] inline auto delta_time() const -> float;
