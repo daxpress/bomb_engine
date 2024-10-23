@@ -2,17 +2,17 @@ use anyhow::{self, Ok};
 use checker::HeaderChecker;
 use generator::Generator;
 
-mod checker;
+pub mod checker;
 mod generator;
 mod parser;
-mod remover;
+pub mod remover;
 
 pub use parser::enitities_representations;
 use parser::HeaderParser;
 
 pub fn run(modules: Vec<Module>) -> Result<(), anyhow::Error> {
     println!("Running Header Tool...");
-    let mut checker = HeaderChecker::new();
+    let mut checker = HeaderChecker::default();
     for module in modules.iter() {
         checker.check(&module.module_headers, &module.module_name);
     }

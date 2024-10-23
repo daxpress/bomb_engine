@@ -35,12 +35,13 @@ pub struct HeaderChecker<'a> {
     headers_cache: HashMap<String, String>,
     operations: Vec<(HeaderCacheOp, &'a str)>,
     current_mod: &'a str,
+    cache_name: &'static str
 }
 
 impl<'a> HeaderChecker<'a> {
-    pub fn new() -> Self {
+    pub fn default() -> Self {
         let mut cache = HashMap::new();
-        match Self::read_cache() {
+        match Self::read_cache(CACHE_NAME) {
             Result::Ok(loaded) => cache = loaded,
             Err(_) => println!("No header cache found!"),
         };
@@ -48,6 +49,20 @@ impl<'a> HeaderChecker<'a> {
             headers_cache: cache,
             operations: Vec::new(),
             current_mod: "",
+            cache_name: CACHE_NAME
+        }
+    }
+    pub fn new(cache_name: &'static str) -> Self {
+        let mut cache = HashMap::new();
+        match Self::read_cache(cache_name) {
+            Result::Ok(loaded) => cache = loaded,
+            Err(_) => println!("No header cache found!"),
+        };
+        HeaderChecker {
+            headers_cache: cache,
+            operations: Vec::new(),
+            current_mod: "",
+            cache_name: cache_name
         }
     }
 
@@ -103,9 +118,9 @@ impl<'a> HeaderChecker<'a> {
     }
 
     /// Reads the cache from disk and returns HashMap<header, content_hash>
-    fn read_cache() -> Result<HashMap<String, String>, Error> {
+    fn read_cache(cache_name: &'static str) -> Result<HashMap<String, String>, Error> {
         // TODO: cache also the module for each of them
-        let file = File::open(Path::new(CACHE_NAME))?;
+        let file = File::open(Path::new(cache_name))?;
         println!("Reading cached file...");
         let lines = io::BufReader::new(file).lines();
         let lines = lines
@@ -169,7 +184,7 @@ impl<'a> HeaderChecker<'a> {
     /// writes the caceh back to disk
     fn write_cache(&self) {
         // TODO: cache the module information
-        let file = File::create(Path::new(CACHE_NAME)).unwrap();
+        let file = File::create(Path::new(self.cache_name)).unwrap();
         let mut writer = io::BufWriter::new(file);
         for (header, hash) in &self.headers_cache {
             writeln!(writer, "{header}={hash}").unwrap();
@@ -210,7 +225,7 @@ mod tests {
     // RUN SEPARATELY!!!
     #[test]
     fn check_no_operations() {
-        let mut checker = HeaderChecker::new();
+        let mut checker = HeaderChecker::default();
         let header = vec![TEST_FILE.to_string()];
         checker.check(&header, "somemod");
         checker.close_checks();
@@ -229,7 +244,7 @@ mod tests {
         }
         // now that wee don't have the cache we can expect to have the file to be generated.
 
-        let mut checker = HeaderChecker::new();
+        let mut checker = HeaderChecker::default();
         let header = vec![TEST_FILE.to_string()];
         checker.check(&header, "somemod");
         checker.close_checks();

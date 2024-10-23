@@ -1,11 +1,15 @@
 use std::env::args;
-// use header_tool;
+use std::path::Path;
+use anyhow::anyhow;
+use pybinder::pybinder::run;
 
-fn main() {
-    println!("Running Pybinder...");
-    let ht_gen_dir = args().skip(1).next().unwrap_or("No Arguments passed!".to_string());
+fn main() -> Result<(), anyhow::Error> {
+    let ht_gen_dir = args().skip(1).next();
 
+    if let None = ht_gen_dir {
+        return Err(anyhow!("No generated dir provided!"));
+    }
+    let ht_gen_dir = ht_gen_dir.unwrap();
 
-    println!("{}", ht_gen_dir);
-    println!("Bindings created.")
+    run(Path::new(&ht_gen_dir))
 }

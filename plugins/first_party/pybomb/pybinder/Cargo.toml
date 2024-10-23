@@ -9,3 +9,5 @@ serde = { version = "*", features = ["derive"]}
 rayon = "*"
 sha1_smol = {version = "*", features = ["std"]}
 header_tool = { path =  "../../../../engine/header_tool"}
+anyhow = "*"
+path-slash = "*"

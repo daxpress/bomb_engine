@@ -16,8 +16,22 @@ get_engine_headers(headers libs)
 
 # get the location of the header tool products
 get_property(ht_products GLOBAL PROPERTY header_tool_products_dir)
+
 # set the pybinder generated dir
-set(generated_dir "${CMAKE_CURRENT_BINARY_DIR}/generated")
+set(generated_dir "${CMAKE_CURRENT_BINARY_DIR}/generated/")
+
+# try and figure out the possible generated files
+set(headers)
+get_engine_headers(headers _)
+
+set(generated_files)
+foreach (header ${headers})
+    get_filename_component(filename ${header} NAME)
+    set(pyheader ${generated_dir} "py_" ${filename})
+    list(APPEND generated_files ${pyheader})
+endforeach ()
+set_source_files_properties(${generated_files} PROPERTIES GENERATED TRUE)
+
 
 add_custom_target(pybinder
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
@@ -36,14 +50,14 @@ add_dependencies(pybomb pybinder)
 # ===================================================
 
 
-
 target_sources(pybomb
         PUBLIC
         "pybomb.h"
         PRIVATE
+        ${generated_files}
         "pybomb.cpp"
 )
-target_include_directories(pybomb PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(pybomb PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${generated_dir})
 # Use the following to embed the interpreter in the library
 target_link_libraries(pybomb PRIVATE pybind11::embed)
 
