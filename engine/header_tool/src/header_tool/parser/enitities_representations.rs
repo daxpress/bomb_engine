@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize, PartialEq)]
 pub enum AccessModifier {
     #[default]
     Public,
@@ -9,7 +9,7 @@ pub enum AccessModifier {
     None,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Function {
     pub name: String,
     pub brief: String,
@@ -19,7 +19,7 @@ pub struct Function {
     pub is_const: bool,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Method {
     pub name: String,
     pub brief: String,
@@ -32,7 +32,7 @@ pub struct Method {
     pub is_const: bool,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Variable {
     pub name: String,
     pub brief: String,
@@ -41,7 +41,7 @@ pub struct Variable {
     pub is_const: bool,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Member {
     pub name: String,
     pub brief: String,
@@ -52,7 +52,7 @@ pub struct Member {
     pub offset: usize,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Class {
     pub name: String,
     pub brief: String,
@@ -64,7 +64,7 @@ pub struct Class {
     pub methods: Vec<Method>,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Enum {
     pub name: String,
     pub brief: String,
@@ -72,14 +72,14 @@ pub struct Enum {
     pub enumerators: Vec<Enumerator>,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Enumerator {
     pub name: String,
     pub s_value: i64,
     pub u_value: u64,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Namespace {
     pub name: String,
     pub namespaces: Vec<Namespace>,
@@ -93,14 +93,14 @@ pub struct Namespace {
 // Implementing here types that overlap with already defined ones (class/struct)
 // to have them printed out correctly to json.
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Argument {
     pub name: String,
     pub var_type: String,
     pub is_const: bool,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Struct {
     pub name: String,
     pub brief: String,

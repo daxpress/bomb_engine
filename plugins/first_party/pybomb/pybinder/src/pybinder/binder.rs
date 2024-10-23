@@ -44,3 +44,19 @@ fn deserialize_file(path: &Path) -> Namespace {
     let json = std::fs::read_to_string(path).unwrap();
     serde_json::from_str(&json).unwrap()
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+    use header_tool::Namespace;
+    use crate::pybinder::binder::deserialize_file;
+
+    #[test]
+    fn deserialize_empty_file_test() {
+        let path = Path::new("src/sample_gen/json/mod2/empty.json");
+
+        let result = deserialize_file(path);
+
+        assert_eq!(Namespace::default(), result);
+    }
+}
