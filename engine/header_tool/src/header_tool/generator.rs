@@ -61,7 +61,7 @@ impl<'a> Generator <'a> {
             .iter()
             .find_map(|extension| filename.strip_suffix(extension))
             .unwrap();
-        format!("{}/{}/{}.{}", dir, module, strip, extension)
+            format!("{}/{}/{}.{}", dir, module, strip, extension)
     }
 
     fn generate_header(parsed_unit: &Namespace, module: &str) {

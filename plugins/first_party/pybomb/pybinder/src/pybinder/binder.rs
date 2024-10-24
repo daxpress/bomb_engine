@@ -34,6 +34,9 @@ pub fn bind_module(module: &Module) {
         .map(|file| deserialize_file(Path::new(file)))
         .collect::<Vec<_>>();
 
+    // make the generated directory if not present
+    generator::make_gen_dir();
+
     // generate the files!
     namespaces
         .into_par_iter()

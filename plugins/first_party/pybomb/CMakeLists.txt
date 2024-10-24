@@ -32,7 +32,6 @@ foreach (header ${headers})
 endforeach ()
 set_source_files_properties(${generated_files} PROPERTIES GENERATED TRUE)
 
-
 add_custom_target(pybinder
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         COMMAND cargo run -r --quiet --target-dir ${CMAKE_CURRENT_BINARY_DIR} --manifest-path "${CMAKE_CURRENT_SOURCE_DIR}/pybinder/Cargo.toml" -- ${ht_products}
@@ -59,7 +58,7 @@ target_sources(pybomb
 )
 target_include_directories(pybomb PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${generated_dir})
 # Use the following to embed the interpreter in the library
-target_link_libraries(pybomb PRIVATE pybind11::embed)
+target_link_libraries(pybomb PRIVATE pybind11::embed bomb_engine_engine)
 
 # Setting dependency on pybomb_module mostly to set the order and tell to build all by only referring to pybomb
 #add_dependencies(pybomb pybomb_module)
