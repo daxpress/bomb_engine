@@ -9,5 +9,3 @@ auto get_interpreter() -> py::scoped_interpreter&
     return python_interpreter;
 
 }
-
-// PYBIND11_EMBEDDED_MODULE(pybomb, module)

@@ -1,6 +1,7 @@
 ﻿mod generator;
+mod pybindify;
 
-use crate::pybinder::binder::generator::generate_header;
+use crate::pybinder::binder::generator::{generate_header, generate_module_init_header};
 use header_tool::header_tool::*;
 use header_tool::Namespace;
 use rayon::iter::IntoParallelIterator;
@@ -37,10 +38,21 @@ pub fn bind_module(module: &Module) {
     // make the generated directory if not present
     generator::make_gen_dir();
 
+    let names = namespaces.iter().map(|namespace| {
+        Path::new(&namespace.name)
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .strip_suffix(".h")
+            .unwrap()
+    }).collect::<Vec<_>>();
+    
+    generate_module_init_header(names.as_slice());
     // generate the files!
     namespaces
         .into_par_iter()
-        .for_each(|namespace| generate_header(&namespace))
+        .for_each(|namespace| generate_header(&namespace));
 }
 
 fn deserialize_file(path: &Path) -> Namespace {
@@ -50,9 +62,9 @@ fn deserialize_file(path: &Path) -> Namespace {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-    use header_tool::Namespace;
     use crate::pybinder::binder::deserialize_file;
+    use header_tool::Namespace;
+    use std::path::Path;
 
     #[test]
     fn deserialize_empty_file_test() {

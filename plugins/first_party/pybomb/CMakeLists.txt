@@ -26,10 +26,14 @@ get_engine_headers(headers _)
 
 set(generated_files)
 foreach (header ${headers})
-    get_filename_component(filename ${header} NAME)
-    set(pyheader ${generated_dir} "py_" ${filename})
+    get_filename_component(filename ${header} NAME_WE)
+    set(pyheader ${generated_dir} "py_" ${filename} ".cpp")
     list(APPEND generated_files ${pyheader})
 endforeach ()
+# add the header for the module inits
+set(pyheader ${generated_dir}module_inits.cpp)
+list(APPEND generated_files ${pyheader})
+
 set_source_files_properties(${generated_files} PROPERTIES GENERATED TRUE)
 
 add_custom_target(pybinder

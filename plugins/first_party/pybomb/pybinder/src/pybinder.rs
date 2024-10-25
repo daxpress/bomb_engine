@@ -66,12 +66,13 @@ mod tests {
     #[test]
     fn build_module_test() {
         let module = build_module(Path::new("src/sample_gen"));
-        assert_eq!(module.module_headers.len(), 2);
+        assert_eq!(module.module_headers.len(), 3);
         assert_eq!(
             module.module_headers,
             [
+                "src/sample_gen/json/mod1/sample.json",
                 "src/sample_gen/json/mod1/test.json",
-                "src/sample_gen/json/mod2/empty.json"
+                "src/sample_gen/json/mod2/empty.json",
             ]
         );
     }

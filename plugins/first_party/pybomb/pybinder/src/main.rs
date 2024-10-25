@@ -1,7 +1,7 @@
+use anyhow::anyhow;
+use pybinder;
 use std::env::args;
 use std::path::Path;
-use anyhow::anyhow;
-use pybinder::pybinder::run;
 
 fn main() -> Result<(), anyhow::Error> {
     let ht_gen_dir = args().skip(1).next();
@@ -11,5 +11,5 @@ fn main() -> Result<(), anyhow::Error> {
     }
     let ht_gen_dir = ht_gen_dir.unwrap();
 
-    run(Path::new(&ht_gen_dir))
+    pybinder::run(Path::new(&ht_gen_dir))
 }

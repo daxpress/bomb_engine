@@ -79,6 +79,8 @@ pub struct Enumerator {
     pub u_value: u64,
 }
 
+/// Namespace is treated as the root of header as well, so the name at the root will actually contain
+/// the header file path, and after that all the internal namespaces contain the namespace name as the name implies
 #[derive(Default, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Namespace {
     pub name: String,
