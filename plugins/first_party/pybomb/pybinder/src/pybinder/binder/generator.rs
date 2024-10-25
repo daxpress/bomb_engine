@@ -18,7 +18,7 @@ pub fn make_gen_dir() {
     }
 }
 
-pub fn generate_module_init_header(names: &[&str]) {
+pub fn generate_module_decls(names: &[&str]) {
     let mut file_content = "".to_string();
     // include pybind11
     file_content.push_str(BindingsBuilder::PYBIND_INCLUDE);

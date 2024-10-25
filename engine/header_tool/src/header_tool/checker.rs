@@ -104,6 +104,18 @@ impl<'a> HeaderChecker<'a> {
             .collect()
     }
 
+    pub fn headers_to_skip(&self) -> Vec<&str> {
+        self
+            .operations
+            .iter()
+            .filter(|op| match &op.0 {
+                HeaderCacheOp::Skip(_) => true,
+                _ => false,
+            })
+            .map(|op| op.0.get_header())
+            .collect()
+    }
+
     pub fn headers_to_delete(&self) -> Vec<&str> {
         let filtered: Vec<&str> = self
             .operations
