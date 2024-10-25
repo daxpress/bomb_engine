@@ -20,10 +20,21 @@ pub fn make_gen_dir() {
 
 pub fn generate_module_init_header(names: &[&str]) {
     let mut file_content = "".to_string();
+    // include pybind11
     file_content.push_str(BindingsBuilder::PYBIND_INCLUDE);
+    // declare init methods based on what we have
     for name in names {
         file_content.push_str(&format!("void init_{}(py::module &m);\n", name));
     }
+    // declare the actual python module
+    file_content.push_str("\nPYBIND11_EMBEDDED_MODULE(bomb_engine, m) {\n");
+    for name in names {
+        // call the init methods
+        file_content.push_str(&format!("\tinit_{}(m);\n", name));
+    }
+    // end module declaration
+    file_content.push_str("}");
+
     // create the file and fill it
     let path = format!("{}/{}{}", GENERATED_DIR, MODULE_INITS_NAME, EXTENSION);
     fs::File::create(Path::new(&path))
@@ -47,7 +58,7 @@ struct BindingsBuilder<'a> {
 impl<'a> BindingsBuilder<'a> {
     // Here some constant strings that are used
     const PYBIND_INCLUDE: &'static str =
-        "#include <pybind11/pybind11.h>\n\nnamespace py = pybind11;\n\n";
+        "#include <pybind11/embed.h>\n\nnamespace py = pybind11;\n\n";
     fn new(namespace: &'a Namespace) -> BindingsBuilder<'a> {
         BindingsBuilder {
             namespace,
