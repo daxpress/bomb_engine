@@ -26,12 +26,17 @@ pub fn generate_module_decls(names: &[&str]) {
     for name in names {
         file_content.push_str(&format!("void init_{}(py::module &m);\n", name));
     }
+    // init for the hand built bindings
+    file_content.push_str("void init_pybomb(py::module &m);\n");
+
     // declare the actual python module
     file_content.push_str("\nPYBIND11_EMBEDDED_MODULE(bomb_engine, m) {\n");
     for name in names {
         // call the init methods
         file_content.push_str(&format!("\tinit_{}(m);\n", name));
     }
+    // also add a function call to init some hand built bindings
+    file_content.push_str("\tinit_pybomb(m);\n");
     // end module declaration
     file_content.push_str("}");
 

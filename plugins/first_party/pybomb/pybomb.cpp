@@ -9,3 +9,9 @@ auto get_interpreter() -> py::scoped_interpreter&
     return python_interpreter;
 
 }
+
+// Declared by generated file!!!
+void init_pybomb(py::module& m)
+{
+
+}
