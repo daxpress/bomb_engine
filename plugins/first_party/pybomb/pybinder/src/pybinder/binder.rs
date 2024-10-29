@@ -35,7 +35,7 @@ pub fn bind_module(module: &Module) {
     let to_skip = checker.headers_to_skip();
 
     // now generate the main binding file (the module declaration + inits) based on the allowed modules
-    if !to_skip.is_empty() || !to_generate.is_empty() {
+    if !checker.headers_to_delete().is_empty() || !to_generate.is_empty() {
         let concatenation = [to_generate.clone(), to_skip].concat();
 
         let names = concatenation

@@ -2,7 +2,7 @@
 // right now it acts more like a sandbox to put everything together and test the functionalities.
 
 #include "app/app.h"
-#include "pybomb.h"
+#include "pybomb_cpp.h"
 
 #ifdef _DEBUG
 constexpr bool debug = true;

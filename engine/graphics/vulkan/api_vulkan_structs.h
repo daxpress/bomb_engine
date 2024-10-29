@@ -1,5 +1,6 @@
 #pragma once
 
+#include <glm/glm.hpp>
 #include <vulkan/vulkan.hpp>
 
 namespace BE_NAMESPACE

@@ -30,7 +30,7 @@ pub fn generate_module_decls(names: &[&str]) {
     file_content.push_str("void init_pybomb(py::module &m);\n");
 
     // declare the actual python module
-    file_content.push_str("\nPYBIND11_EMBEDDED_MODULE(bomb_engine, m) {\n");
+    file_content.push_str("\nPYBIND11_MODULE(pybomb, m, py::mod_gil_not_used()) {\n");
     for name in names {
         // call the init methods
         file_content.push_str(&format!("\tinit_{}(m);\n", name));
@@ -63,7 +63,7 @@ struct BindingsBuilder<'a> {
 impl<'a> BindingsBuilder<'a> {
     // Here some constant strings that are used
     const PYBIND_INCLUDE: &'static str =
-        "#include <pybind11/embed.h>\n\nnamespace py = pybind11;\n\n";
+        "#include <pybind11/pybind11.h>\n\nnamespace py = pybind11;\n\n";
     fn new(namespace: &'a Namespace) -> BindingsBuilder<'a> {
         BindingsBuilder {
             namespace,
