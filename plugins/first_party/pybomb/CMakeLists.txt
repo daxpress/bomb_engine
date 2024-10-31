@@ -1,7 +1,7 @@
 project(pybomb_cpp LANGUAGES CXX)
 
 # specify the Python version to be 3.13 (atm at least)
-set (Python_FIND_ABI "ANY" "ANY" "ANY" "ON")
+set(Python_FIND_ABI "ANY" "ANY" "ANY" "ON")
 find_package(Python 3.13 COMPONENTS Interpreter Development REQUIRED)
 find_package(pybind11 REQUIRED)
 add_library(pybomb_cpp STATIC)
@@ -29,9 +29,6 @@ add_custom_target(pybinder
 
 add_custom_command(OUTPUT generated_dir WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} COMMAND pybinder)
 
-# Set dependency for pybinder: it needs the header generated files to compile!
-add_dependencies(pybomb_cpp pybinder)
-
 # ===================================================
 # pybomb_cpp
 # ===================================================
@@ -46,7 +43,9 @@ target_include_directories(pybomb_cpp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${gener
 # Use the following to embed the interpreter in the library
 target_link_libraries(pybomb_cpp PRIVATE pybind11::embed)
 
-# Setting dependency on pybomb_cpp_module mostly to set the order and tell to build all by only referring to pybomb_cpp
+
+# Set dependency for pybinder: it needs the header generated files to compile!
+add_dependencies(pybomb_cpp pybinder)
 
 # ===================================================
 # pybomb module
@@ -78,6 +77,9 @@ pybind11_add_module(pybomb
 target_link_libraries(pybomb PRIVATE bomb_engine_engine)
 target_include_directories(pybomb PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${generated_dir})
 
+# now generate the stubs after compiling pybomb
+add_custom_command(TARGET pybomb POST_BUILD COMMAND stubgen -p pybomb -o .
+        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>" COMMENT "Generating stubs...")
 
 add_dependencies(pybomb pybinder)
 add_dependencies(pybomb_cpp pybomb)
