@@ -9,6 +9,8 @@ static GENERATED_DIR: &str = "generated";
 static ENGINE_SPLIT_STR: &str = "bomb_engine/engine/";
 static MODULE_INITS_NAME: &str = "module_inits";
 
+static MODULE_DECL: &str = "\nPYBIND11_MODULE(bomb_engine, m, py::mod_gil_not_used()) {\n";
+
 static EXTENSION: &str = ".cpp";
 
 pub fn make_gen_dir() {
@@ -30,7 +32,7 @@ pub fn generate_module_decls(names: &[&str]) {
     file_content.push_str("void init_pybomb(py::module &m);\n");
 
     // declare the actual python module
-    file_content.push_str("\nPYBIND11_MODULE(pybomb, m, py::mod_gil_not_used()) {\n");
+    file_content.push_str(MODULE_DECL);
     for name in names {
         // call the init methods
         file_content.push_str(&format!("\tinit_{}(m);\n", name));

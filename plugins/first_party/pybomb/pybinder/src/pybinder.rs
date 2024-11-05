@@ -20,7 +20,7 @@ fn build_module(gen_dir: &Path) -> Module {
     // use json generated files to detect changes for the cache
 
     let mut module = Module {
-        module_name: "pybomb".to_string(),
+        module_name: "bomb_engine".to_string(),
         module_headers: Vec::new(),
     };
 
