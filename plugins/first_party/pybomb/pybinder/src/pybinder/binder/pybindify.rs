@@ -7,7 +7,11 @@ pub trait Pybindify {
 
 impl Pybindify for Namespace {
     fn to_cpp_binding(&self) -> String {
-        String::new()
+        let string = String::new();
+        
+        
+        
+        string
     }
 }
 

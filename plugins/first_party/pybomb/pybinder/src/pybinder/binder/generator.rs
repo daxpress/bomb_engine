@@ -1,5 +1,6 @@
 ﻿use super::pybindify::*;
 use header_tool::Namespace;
+use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
@@ -20,12 +21,13 @@ pub fn make_gen_dir() {
     }
 }
 
-pub fn generate_module_decls(names: &[&str]) {
+pub fn generate_module_decls(map: &HashMap<&str, Vec<&str>>) {
+    let names = map.values().flatten().collect::<Vec<_>>();
     let mut file_content = "".to_string();
     // include pybind11
     file_content.push_str(BindingsBuilder::PYBIND_INCLUDE);
     // declare init methods based on what we have
-    for name in names {
+    for name in names.iter() {
         file_content.push_str(&format!("void init_{}(py::module &m);\n", name));
     }
     // init for the hand built bindings
@@ -33,9 +35,18 @@ pub fn generate_module_decls(names: &[&str]) {
 
     // declare the actual python module
     file_content.push_str(MODULE_DECL);
-    for name in names {
-        // call the init methods
-        file_content.push_str(&format!("\tinit_{}(m);\n", name));
+    // TODO: take the module names to build python submodules and pass them as arguments for the init functions
+    // for name in names.iter() {
+    //     // call the init methods
+    //     file_content.push_str(&format!("\tinit_{}(m);\n", name));
+    // }
+    for module in map.keys() {
+        let module_strip = module.strip_prefix("bomb_engine_").unwrap();
+        file_content.push_str(
+            &format!("\tauto mod_{module_strip} = m.def_submodule(\"{module_strip}\", \"bomb engine's {module_strip} module\");\n"));
+        map[module].iter().for_each(|name| {
+            file_content.push_str(&format!("\tinit_{}(mod_{});\n", name, module_strip))
+        });
     }
     // also add a function call to init some hand built bindings
     file_content.push_str("\tinit_pybomb(m);\n");

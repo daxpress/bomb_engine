@@ -1,6 +1,4 @@
 #version 450
-#extension GL_KHR_vulkan_glsl : enable
-
 
 layout (location = 0) out vec4 finalColor;
 
@@ -11,5 +9,5 @@ layout (binding = 1) uniform sampler2D texSampler;
 
 void main()
 {
-	finalColor = texture(texSampler, texCoord);
+	finalColor = texture(texSampler, texCoord) * (fragColor, 1.0);
 }

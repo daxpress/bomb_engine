@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use clang::*;
 
 pub mod enitities_representations;
+use crate::checker::CheckerResult;
 use enitities_representations::*;
 
 pub struct HeaderParser {
@@ -45,11 +46,14 @@ impl HeaderParser {
     }
 
     /// Parses all the headers in a slice.
-    pub fn parse_header_collection<'a>(&'a self, headers: &[(&str, &'a str)]) -> Vec<(Namespace, &str)> {
+    pub fn parse_header_collection<'a>(
+        &'a self,
+        headers: &[CheckerResult<'a>],
+    ) -> Vec<(Namespace, &'a str)> {
         let index = Index::new(&self.clang, false, false);
         headers
             .iter()
-            .map(|header| (self.parse_header(&index, header.0), header.1))
+            .map(|header| (self.parse_header(&index, header.header), header.module))
             .collect()
     }
 
@@ -381,11 +385,15 @@ impl HeaderParser {
 #[cfg(test)]
 mod tests {
     use super::HeaderParser;
+    use crate::checker::CheckerResult;
 
     #[test]
     fn parse_test() {
         let parser = HeaderParser::new();
-        let test_header = parser.parse_header_collection(&[("src/header_tool/somemod/test_header.h", "somemod")]);
+        let test_header = parser.parse_header_collection(&[CheckerResult::new(
+            "src/header_tool/somemod/test_header.h",
+            "somemod",
+        )]);
         println!("{test_header:#?}")
     }
 }

@@ -13,9 +13,9 @@ const CACHE_NAME: &'static str = "headercache.cache";
 #[derive(Debug, PartialEq, Clone)]
 pub enum HeaderCacheOp {
     Add(String, String),
-    Remove(String),
+    Remove(String, String),
     Update(String, String),
-    Skip(String),
+    Skip(String, String),
 }
 
 impl HeaderCacheOp {
@@ -23,9 +23,21 @@ impl HeaderCacheOp {
         match self {
             HeaderCacheOp::Add(header, _) => &header,
             HeaderCacheOp::Update(header, _) => &header,
-            HeaderCacheOp::Remove(header) => &header,
-            HeaderCacheOp::Skip(header) => &header,
+            HeaderCacheOp::Remove(header, _) => &header,
+            HeaderCacheOp::Skip(header, _) => &header,
         }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct CheckerResult<'a> {
+    pub header: &'a str,
+    pub module: &'a str,
+}
+
+impl<'a> CheckerResult<'a> {
+    pub fn new(header: &'a str, module: &'a str) -> Self {
+        Self { header, module }
     }
 }
 
@@ -35,7 +47,7 @@ pub struct HeaderChecker<'a> {
     headers_cache: HashMap<String, String>,
     operations: Vec<(HeaderCacheOp, &'a str)>,
     current_mod: &'a str,
-    cache_name: &'static str
+    cache_name: &'static str,
 }
 
 impl<'a> HeaderChecker<'a> {
@@ -49,7 +61,7 @@ impl<'a> HeaderChecker<'a> {
             headers_cache: cache,
             operations: Vec::new(),
             current_mod: "",
-            cache_name: CACHE_NAME
+            cache_name: CACHE_NAME,
         }
     }
     pub fn new(cache_name: &'static str) -> Self {
@@ -62,7 +74,7 @@ impl<'a> HeaderChecker<'a> {
             headers_cache: cache,
             operations: Vec::new(),
             current_mod: "",
-            cache_name: cache_name
+            cache_name: cache_name,
         }
     }
 
@@ -91,40 +103,38 @@ impl<'a> HeaderChecker<'a> {
         self.operations.extend(to_remove);
     }
 
-    pub fn headers_to_generate(&self) -> Vec<(&str, &str)> {
-        self
-            .operations
+    pub fn headers_to_generate(&self) -> Vec<CheckerResult> {
+        self.operations
             .iter()
             .filter(|op| match &op.0 {
                 HeaderCacheOp::Add(_, _) => true,
                 HeaderCacheOp::Update(_, _) => true,
                 _ => false,
             })
-            .map(|op| (op.0.get_header(), op.1))
+            .map(|op| CheckerResult::new(op.0.get_header(), op.1))
             .collect()
     }
 
-    pub fn headers_to_skip(&self) -> Vec<&str> {
-        self
-            .operations
+    pub fn headers_to_skip(&self) -> Vec<CheckerResult> {
+        self.operations
             .iter()
             .filter(|op| match &op.0 {
-                HeaderCacheOp::Skip(_) => true,
+                HeaderCacheOp::Skip(_, _) => true,
                 _ => false,
             })
-            .map(|op| op.0.get_header())
+            .map(|op| CheckerResult::new(op.0.get_header(), op.1))
             .collect()
     }
 
-    pub fn headers_to_delete(&self) -> Vec<&str> {
-        let filtered: Vec<&str> = self
+    pub fn headers_to_delete(&self) -> Vec<CheckerResult> {
+        let filtered: Vec<CheckerResult> = self
             .operations
             .iter()
             .filter(|op| match &op.0 {
-                HeaderCacheOp::Remove(_) => true,
+                HeaderCacheOp::Remove(_, _) => true,
                 _ => false,
             })
-            .map(|op| op.0.get_header())
+            .map(|op| CheckerResult::new(op.0.get_header(), op.1))
             .collect();
         filtered
     }
@@ -173,7 +183,7 @@ impl<'a> HeaderChecker<'a> {
             if self.headers_cache[header] != hash {
                 HeaderCacheOp::Update(header.to_string(), hash)
             } else {
-                HeaderCacheOp::Skip(header.to_string())
+                HeaderCacheOp::Skip(header.to_string(), hash)
             }
         } else {
             HeaderCacheOp::Add(header.to_string(), hash)
@@ -189,7 +199,7 @@ impl<'a> HeaderChecker<'a> {
             .clone()
             .into_par_iter()
             .filter(|entry| !headers.contains(&entry.0.as_str()))
-            .map(|elem| HeaderCacheOp::Remove(elem.0.to_string()))
+            .map(|elem| HeaderCacheOp::Remove(elem.0.to_string(), elem.1.to_string()))
             .collect()
     }
 
@@ -206,10 +216,10 @@ impl<'a> HeaderChecker<'a> {
     fn update_cache(&mut self, check_results: &Vec<(HeaderCacheOp, &str)>) {
         for result in check_results {
             match &result.0 {
-                HeaderCacheOp::Remove(header) => {
+                HeaderCacheOp::Remove(header, _) => {
                     self.headers_cache.remove(header);
                 }
-                HeaderCacheOp::Skip(_) => (),
+                HeaderCacheOp::Skip(_, _) => (),
                 HeaderCacheOp::Add(header, hash) | HeaderCacheOp::Update(header, hash) => {
                     self.headers_cache
                         .insert(header.to_string(), hash.to_string());
@@ -227,9 +237,9 @@ impl Drop for HeaderChecker<'_> {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, path::Path};
-
     use super::{HeaderChecker, CACHE_NAME};
+    use crate::checker::CheckerResult;
+    use std::{fs, path::Path};
 
     const TEST_FILE: &'static str = "src/header_tool/somemod/test_header.h";
     // cache is generated in the root dir, use CACHE_NAME
@@ -264,7 +274,7 @@ mod tests {
         let result = checker.headers_to_generate();
         assert!(!result.is_empty());
 
-        let expected = vec![(TEST_FILE, "somemod")];
+        let expected = vec![CheckerResult::new(TEST_FILE, "somemod")];
         assert_eq!(expected, result);
     }
 }

@@ -22,7 +22,8 @@ pub fn run(modules: Vec<Module>) -> Result<(), anyhow::Error> {
     // TODO: simplify the removal by caching the module as well
     let to_delete = checker.headers_to_delete();
     let modules: Vec<&str> = modules.iter().map(|module| module.module_name.as_ref()).collect();
-    remover::delete_generated(&to_delete, &modules);
+    let headers: Vec<&str> = to_delete.iter().map(|result| result.header).collect();
+    remover::delete_generated(&headers, &modules);
 
     // parse data
     let to_generate = checker.headers_to_generate();
