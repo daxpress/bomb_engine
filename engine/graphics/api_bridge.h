@@ -6,7 +6,7 @@ namespace BE_NAMESPACE
 {
 class IAPI;
 
-enum class E_API : uint8_t
+enum class [[expose]] E_API : uint8_t
 {
     API_VULKAN = 0,
     API_DIRECTX = 1,

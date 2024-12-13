@@ -6,7 +6,7 @@
 namespace BE_NAMESPACE
 {
 // small wrapper to allow easier entity allocation and management for users
-class Entity
+class [[expose]] Entity
 {
 public:
     explicit Entity(Scene& scene);

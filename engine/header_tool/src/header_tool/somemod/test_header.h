@@ -67,8 +67,8 @@ namespace exposition
     {
     public:
         OOPs();
-        OOPs(OOPs &other);
-        OOPs(OOPs &&other);
+        OOPs(const OOPs &other);
+        OOPs(const OOPs &&other);
         OOPs &operator=(OOPs &other);
         OOPs &operator=(OOPs &&other);
 

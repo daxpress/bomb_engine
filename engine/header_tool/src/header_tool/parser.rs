@@ -153,7 +153,6 @@ impl HeaderParser {
     }
 
     fn parse_class(class: &Entity) -> Option<Class> {
-        // TODO Parse destructor,constructor, copy and move ctor.
         if !Self::marked_as_exposed(class) {
             return None;
         }
@@ -226,6 +225,20 @@ impl HeaderParser {
                 class_info.destructor = dtor;
             }
         }
+
+        class_info.is_abstract = class.is_abstract_record();
+
+        class_info.parents = class
+            .get_children()
+            .into_iter()
+            .filter_map(|child| {
+                if child.get_kind() == EntityKind::BaseSpecifier {
+                    return Some(child.get_display_name().unwrap());
+                }
+                None
+            })
+            .collect::<Vec<String>>();
+
         Some(class_info)
     }
 

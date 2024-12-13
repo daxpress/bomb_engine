@@ -56,8 +56,10 @@ pub fn bind_modules(modules: &Vec<Module>) {
 fn get_module_hashmap(results: Vec<CheckerResult>) -> HashMap<&str, Vec<&str>> {
     let mut map: HashMap<&str, Vec<&str>> = HashMap::new();
     for result in results.iter() {
-        if map.contains_key(result.module) {
-            let header = Path::new(result.header)
+        if !map.contains_key(result.module) {
+            map.insert(result.module, Vec::new());
+        }
+        let header = Path::new(result.header)
                 .file_name()
                 .unwrap()
                 .to_str()
@@ -65,9 +67,6 @@ fn get_module_hashmap(results: Vec<CheckerResult>) -> HashMap<&str, Vec<&str>> {
                 .strip_suffix(".json")
                 .unwrap();
             map.get_mut(result.module).unwrap().push(header);
-        } else {
-            map.insert(result.module, Vec::new());
-        }
     }
     map
 }

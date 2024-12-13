@@ -3,7 +3,7 @@ use checker::HeaderChecker;
 use generator::Generator;
 
 pub mod checker;
-mod generator;
+pub mod generator;
 mod parser;
 pub mod remover;
 

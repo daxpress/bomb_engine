@@ -11,6 +11,7 @@ static ENGINE_SPLIT_STR: &str = "bomb_engine/engine/";
 static MODULE_INITS_NAME: &str = "module_inits";
 
 static MODULE_DECL: &str = "\nPYBIND11_MODULE(bomb_engine, m, py::mod_gil_not_used()) {\n";
+static USING_BE: &str = "using namespace BE_NAMESPACE;\n\n";
 
 static EXTENSION: &str = ".cpp";
 
@@ -35,17 +36,12 @@ pub fn generate_module_decls(map: &HashMap<&str, Vec<&str>>) {
 
     // declare the actual python module
     file_content.push_str(MODULE_DECL);
-    // TODO: take the module names to build python submodules and pass them as arguments for the init functions
-    // for name in names.iter() {
-    //     // call the init methods
-    //     file_content.push_str(&format!("\tinit_{}(m);\n", name));
-    // }
     for module in map.keys() {
         let module_strip = module.strip_prefix("bomb_engine_").unwrap();
         file_content.push_str(
-            &format!("\tauto mod_{module_strip} = m.def_submodule(\"{module_strip}\", \"bomb engine's {module_strip} module\");\n"));
+            &format!("\tauto {module_strip} = m.def_submodule(\"{module_strip}\", \"\");\n"));
         map[module].iter().for_each(|name| {
-            file_content.push_str(&format!("\tinit_{}(mod_{});\n", name, module_strip))
+            file_content.push_str(&format!("\tinit_{}({});\n", name, module_strip))
         });
     }
     // also add a function call to init some hand built bindings
@@ -104,12 +100,13 @@ impl<'a> BindingsBuilder<'a> {
 
         // first the header include and the pybind11 header
         file_content.push_str(&self.include(&self.namespace.name));
+        file_content.push_str(USING_BE);
         file_content.push_str(Self::PYBIND_INCLUDE);
         // define the init function where we will be building the module (NOTE: SCOPE IS OPEN!)
         file_content.push_str(&format!("void init_{}(py::module &m) {{\n", self.filename));
 
         // kickoff the production of the header from the namespace
-        let root = self.namespace.to_cpp_binding();
+        let root = self.namespace.to_cpp("m");
         // this should be all of it...
         file_content.push_str(&root);
         file_content.push_str("}\n");
@@ -168,6 +165,8 @@ mod tests {
 
         let expected = r#"
 #include "mod1/test.h"
+using namespace BE_NAMESPACE;
+
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
