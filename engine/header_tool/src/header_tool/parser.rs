@@ -162,18 +162,31 @@ impl HeaderParser {
         class_info.size = class.get_type().unwrap().get_sizeof().unwrap();
         class_info.alignment = class.get_type().unwrap().get_alignof().unwrap();
         class_info.brief = class.get_comment_brief().unwrap_or_default();
+
         // get methods
         let methods: Vec<Entity> = class
             .get_children()
             .into_iter()
             .filter(|child| child.get_kind() == EntityKind::Method)
             .collect();
+        // get overloaded methods 
+        let mut overloads = HashSet::new();
+        for i in 0..methods.len() {
+            for j in (i + 1)..methods.len() {
+                if Self::is_overload(&methods[i], &methods[j]) {
+                    overloads.insert(methods[i]);
+                    overloads.insert(methods[j]);
+                }
+            }
+        }
 
         for method in methods.iter() {
-            if let Some(method) = Self::parse_method(method) {
+            let is_overload = overloads.contains(&method);
+            if let Some(method) = Self::parse_method(method, is_overload) {
                 class_info.methods.push(method);
             }
         }
+
         // get members
         let members: Vec<Entity> = class
             .get_children()
@@ -221,7 +234,7 @@ impl HeaderParser {
             .into_iter()
             .find(|child| child.get_kind() == EntityKind::Destructor);
         if let Some(dtor) = dtor {
-            if let Some(dtor) = Self::parse_method(&dtor) {
+            if let Some(dtor) = Self::parse_method(&dtor, false) {
                 class_info.destructor = dtor;
             }
         }
@@ -308,7 +321,7 @@ impl HeaderParser {
         Some(var_info)
     }
 
-    fn parse_method(method: &Entity) -> Option<Method> {
+    fn parse_method(method: &Entity, is_overload: bool) -> Option<Method> {
         if Self::marked_as_hidden(method) {
             return None;
         }
@@ -325,12 +338,44 @@ impl HeaderParser {
         method_info.is_pure_virtual = method.is_pure_virtual_method();
         method_info.is_static = method.is_static_method();
         method_info.brief = method.get_comment_brief().unwrap_or_default();
+        method_info.is_overload = is_overload;
 
         if let Some(args) = method.get_arguments() {
             method_info.args.reserve(args.len());
             method_info.args = Self::parse_args(args)
         }
         Some(method_info)
+    }
+
+    fn is_overload(method1: &Entity, method2: &Entity) -> bool {
+        static OPERATOR_SIG: &str = "operator";
+        // exclude assignment and move operators (and others)
+        if method1.get_name().unwrap().contains(OPERATOR_SIG)
+            || method2.get_name().unwrap().contains(OPERATOR_SIG)
+        {
+            return false;
+        }
+        // Check if names are the same
+        if method1.get_name() != method2.get_name() {
+            return false;
+        }
+
+        // Check if parameter types differ
+        let params1 = method1.get_arguments().unwrap_or_default();
+        let params2 = method2.get_arguments().unwrap_or_default();
+
+        if params1.len() != params2.len() {
+            return true;
+        }
+
+        // Compare parameter types
+        for (param1, param2) in params1.iter().zip(params2.iter()) {
+            if param1.get_type() != param2.get_type() {
+                return true;
+            }
+        }
+        // Methods are identical in signature; not overloads
+        false
     }
 
     fn parse_args(args: Vec<Entity>) -> Vec<Argument> {
@@ -386,7 +431,7 @@ impl HeaderParser {
     }
 
     fn parse_ctor(ctor: &Entity, owner: &Entity) -> Option<Method> {
-        if let Some(mut ctor) = Self::parse_method(ctor) {
+        if let Some(mut ctor) = Self::parse_method(ctor, false) {
             ctor.return_type = owner.get_type().unwrap().get_display_name();
             Some(ctor)
         } else {

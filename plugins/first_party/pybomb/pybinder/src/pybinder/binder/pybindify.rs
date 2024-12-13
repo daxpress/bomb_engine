@@ -235,25 +235,49 @@ impl Pybindify for Function {
 
 impl Pybindify for &Method {
     fn to_cpp(&self, module: &str) -> String {
-        match self.access {
-            AccessModifier::Public => {
-                let mut code = String::new();
-                code.push_str(&format!(
-                    "\t.def(\"{}\", &{}::{}, \"{}\"",
-                    self.name, module, self.name, self.brief
-                ));
-                if !self.args.is_empty() {
-                    code.push_str(", ");
-                }
-                // fill arguments list
-                code.push_str(&get_entities_code(Box::new(self.args.iter()), module, ", "));
-                //close function call
-                code.push_str(")");
-                code
-            }
-            _ => String::new(),
-            // can't bind private and protected code, I need to reference methods and members to do that
+        if self.access != AccessModifier::Public {
+            return String::new();
         }
+        let mut code = String::new();
+
+        if self.is_overload {
+            // overload function requires this signature!!
+            code.push_str(&format!("\t.def(\"{}\", py::overload_cast<", self.name));
+            // fill types here
+            if !self.args.is_empty() {
+                let args = self
+                    .args
+                    .iter()
+                    .map(|arg| arg.var_type.clone())
+                    .collect::<Vec<String>>();
+                code.push_str(&args.join(", "));
+            }
+            code.push_str(">");
+
+            code.push_str(&format!("(&{}::{}), \"{}\"", module, self.name, self.brief));
+            if !self.args.is_empty() {
+                code.push_str(", ");
+            }
+            // fill arguments list
+            code.push_str(&get_entities_code(Box::new(self.args.iter()), module, ", "));
+            //close function call
+            code.push_str(")");
+            code
+        } else {
+            code.push_str(&format!(
+                "\t.def(\"{}\", &{}::{}, \"{}\"",
+                self.name, module, self.name, self.brief
+            ));
+            if !self.args.is_empty() {
+                code.push_str(", ");
+            }
+            // fill arguments list
+            code.push_str(&get_entities_code(Box::new(self.args.iter()), module, ", "));
+            //close function call
+            code.push_str(")");
+            code
+        }
+        // will probably get bigger due to operators...
     }
 }
 
@@ -475,6 +499,7 @@ mod tests {
             is_const: false,
             is_static: false,
             return_type: "".to_string(),
+            is_overload: false,
         };
 
         assert_eq!(
@@ -505,6 +530,44 @@ mod tests {
         assert_eq!(
             method.to_cpp("m"),
             "\t.def(\"some_function\", &m::some_function, \"this is a brief\", \
+            py::arg(\"arg1\"), py::arg(\"arg2\"), py::arg(\"arg3\"))"
+        );
+    }
+    #[test]
+    fn test_method_overload_params() {
+        let method = Method {
+            name: "some_function".to_string(),
+            brief: "this is a brief".to_string(),
+            access: Public,
+            is_pure_virtual: false,
+            is_virtual: false,
+            args: vec![
+                Argument {
+                    name: "arg1".to_string(),
+                    is_const: false,
+                    var_type: "int".to_string(),
+                },
+                Argument {
+                    name: "arg2".to_string(),
+                    is_const: false,
+                    var_type: "const char".to_string(),
+                },
+                Argument {
+                    name: "arg3".to_string(),
+                    is_const: false,
+                    var_type: "Cat&".to_string(),
+                },
+            ],
+            is_const: false,
+            is_static: false,
+            return_type: "".to_string(),
+            is_overload: true,
+        };
+
+        assert_eq!(
+            method.to_cpp("m"),
+            "\t.def(\"some_function\", py::overload_cast<int, const char, Cat&>(&m::some_function), \
+            \"this is a brief\", \
             py::arg(\"arg1\"), py::arg(\"arg2\"), py::arg(\"arg3\"))"
         );
     }
@@ -568,6 +631,7 @@ mod tests {
                 }],
                 access: Public,
                 return_type: "".to_string(),
+                is_overload: false,
             }],
             destructor: Method::default(),
             members: vec![Member {
@@ -590,6 +654,7 @@ mod tests {
                     args: Vec::new(),
                     access: Public,
                     return_type: "".to_string(),
+                    is_overload: false,
                 },
                 Method {
                     name: "judge".to_string(),
@@ -601,6 +666,7 @@ mod tests {
                     args: Vec::new(),
                     access: Public,
                     return_type: "".to_string(),
+                    is_overload: false,
                 },
             ],
         };

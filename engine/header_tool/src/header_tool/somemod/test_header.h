@@ -17,6 +17,9 @@ namespace exposition
 
         /// @brief method brief.
         void pub_met() {};
+        /// overload
+        void pub_met(int i) {};
+        auto operator==(const ThisIsClass &other) -> bool { return pub_int == other.pub_int; }
 
         [[hide]]
         void hidden() {};

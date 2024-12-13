@@ -30,6 +30,7 @@ pub struct Method {
     pub is_pure_virtual: bool,
     pub is_static: bool,
     pub is_const: bool,
+    pub is_overload: bool,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, PartialEq, Clone)]
