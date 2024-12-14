@@ -27,7 +27,7 @@ private:
     // uuid generation overloads for the function
 
     template <typename Callable>
-        requires !std::is_member_function_pointer_v<Callable>
+        requires (!std::is_member_function_pointer_v<Callable>)
                   static auto generate_key(Callable callable)->size_t
     {
         // it doesn't make sense to put the same free function twice in a dispatcher so this is fine
@@ -44,7 +44,7 @@ private:
 public:
     // add_listener overloads for functions and methods and restrict compilation using requirements
     template <typename Callable>
-        requires !std::is_member_function_pointer_v<Callable>
+        requires (!std::is_member_function_pointer_v<Callable>)
                  inline void add_listener(Callable && listener)
     {
         place_listener(generate_key(listener), std::forward<Callable>(listener));
@@ -71,7 +71,7 @@ public:
     }
 
     template <typename Callable>
-        requires !std::is_member_function_pointer_v<Callable>
+        requires (!std::is_member_function_pointer_v<Callable>)
                  inline void remove_listener(Callable callable)
     {
         listeners.erase(generate_key(callable));

@@ -28,7 +28,7 @@ private:
 
     const vk::Format DEPTH_FORMAT = vk::Format::eD32SfloatS8Uint;
     const std::array<vk::ClearValue, 2> CLEAR_VALUES = {
-        vk::ClearColorValue({0.0f, 0.0f, 0.0f, 1.0f}), vk::ClearDepthStencilValue(1.0f, 0.0f)
+        vk::ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f), vk::ClearDepthStencilValue(1.0f, 0.0f)
     };
     const int MAX_FRAMES_IN_FLIGHT = 2;
 
