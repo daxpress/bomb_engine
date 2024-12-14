@@ -1,0 +1,4 @@
+---
+Checks: 'modernize-*,clang-analyzer-*,performance-*,portability-*,google-*,concurrency-*,-google-readability-todo'
+HeaderFilterRegex: '.*bomb_engine/.*'
+...

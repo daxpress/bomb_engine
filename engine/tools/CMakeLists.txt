@@ -6,6 +6,7 @@ add_library(bomb_engine_tools OBJECT)
 add_dependencies(bomb_engine_tools header_tool)
 
 set_property(GLOBAL APPEND PROPERTY header_tool_targets bomb_engine_tools)
+setup_static_analysis(bomb_engine_tools)
 
 target_sources(bomb_engine_tools
         PUBLIC

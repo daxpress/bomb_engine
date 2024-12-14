@@ -43,6 +43,8 @@ function(new_engine_module module_name library_type)
 
     set_property(GLOBAL APPEND PROPERTY header_tool_targets ${module_name})
 
+    setup_static_analysis(${module_name})
+
     # builds a precompiled header for each module so that we can have common stl stuff in the engine one
     # and another one in the module that contains external libraries for the module
     get_target_property(common_pch bomb_engine_engine SOURCE_DIR)
@@ -79,6 +81,8 @@ function(new_engine_plugin plugin_name library_type)
     add_dependencies(${plugin_name} header_tool)
 
     set_property(GLOBAL APPEND PROPERTY header_tool_targets ${plugin_name})
+    setup_static_analysis(${module_name})
+
 endfunction()
 
 # populates the out_headers parameter with the engine headers list and the out_libs with the engine modules
@@ -111,4 +115,16 @@ macro(get_header_tool_targets out_ht_args)
             list(APPEND ${out_ht_args} ${__headers})
         endif()
     endforeach()
+endmacro()
+
+macro(setup_static_analysis target)
+    if(STATIC_ANALYSIS)
+        set_target_properties(${target} PROPERTIES
+                VS_GLOBAL_RunCodeAnalysis true
+                # Use clangtidy
+                VS_GLOBAL_EnableClangTidyCodeAnalysis true
+        )
+        set(CMAKE_CXX_CLANG_TIDY clang-tidy)
+        message("Static Analysis Enabled")
+    endif ()
 endmacro()
