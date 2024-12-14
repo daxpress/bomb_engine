@@ -48,7 +48,7 @@ target_sources(pybomb_cpp
 target_include_directories(pybomb_cpp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${generated_dir})
 # Use the following to embed the interpreter in the library
 target_link_libraries(pybomb_cpp PRIVATE pybind11::embed)
-
+setup_static_analysis(pybomb_cpp)
 
 # Set dependency for pybinder: it needs the header generated files to compile!
 add_dependencies(pybomb_cpp pybinder)
@@ -81,6 +81,8 @@ pybind11_add_module(pybomb
 )
 
 set_target_properties(pybomb PROPERTIES OUTPUT_NAME "bomb_engine")
+# tried static analysis but it takes a long time just to get readability-identifier-length and google-build-using-namespace
+# the first is comfy to use, the latter is required to correctly bind namespaces contents
 
 #target_compile_definitions(pybomb PRIVATE Py_GIL_DISABLED=1)
 target_link_libraries(pybomb PRIVATE bomb_engine_engine)

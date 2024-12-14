@@ -1,4 +1,4 @@
 ---
-Checks: 'modernize-*,clang-analyzer-*,performance-*,portability-*,google-*,concurrency-*,-google-readability-todo'
+Checks: 'modernize-*,clang-analyzer-*,performance-*,portability-*,google-*,concurrency-*,bug-prone-*,cppcoreguidelines=*,misc-*,readability-*,-google-readability-todo,-misc-include-cleaner'
 HeaderFilterRegex: '.*bomb_engine/.*'
 ...

@@ -1561,7 +1561,7 @@ void APIVulkan::record_example_command_buffer(vk::CommandBuffer buffer, uint32_t
     );
 
     buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, m_example_pipeline);
-    size_t offsets[] = {0};
+    std::array<size_t, 1> offsets = {0};
     buffer.bindVertexBuffers(0, m_model_vb, offsets);
     buffer.bindIndexBuffer(m_model_ib, 0, vk::IndexType::eUint32);
 
