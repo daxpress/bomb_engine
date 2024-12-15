@@ -6,15 +6,20 @@ namespace py = pybind11;
 
 class SomeClass
 {
-    public:
+public:
     SomeClass() = default;
-    SomeClass(const std::string& name){};
+    SomeClass(const std::string& name) {};
 };
 
 void init_pybomb(py::module& m)
 {
     // testing module functionality
     m.def("print", []() { Log(LogTempCategory, LogSeverity::Log, "python print using module"); });
-    py::class_<SomeClass>(m, "SomeClass")
-    .def(py::init<const std::string&>(), py::arg("name"));
+    py::class_<SomeClass>(m, "SomeClass").def(py::init<const std::string&>(), py::arg("name"));
+    py::class_<Log<>>(m, "Log").def(
+        py::init<const LogCategory&, LogSeverity, const std::string&>(),
+        py::arg("LogCategory"),
+        py::arg("LogSeverity"),
+        py::arg("message")
+    );
 }

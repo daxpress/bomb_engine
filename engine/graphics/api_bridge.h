@@ -12,7 +12,7 @@ enum class [[expose]] E_API : uint8_t
     API_DIRECTX = 1,
 };
 
-class APIBridge
+class [[expose]] APIBridge
 {
 public:
     APIBridge() = default;

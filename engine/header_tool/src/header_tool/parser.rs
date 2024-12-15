@@ -294,7 +294,7 @@ impl HeaderParser {
             return None;
         }
         let mut func_info = Function::default();
-        func_info.name = func.get_display_name().unwrap();
+        func_info.name = func.get_name().unwrap();
         func_info.is_const = func.is_const_method();
         func_info.is_static = func.is_static_method();
         func_info.return_type = func.get_result_type().unwrap().get_display_name();
@@ -326,7 +326,7 @@ impl HeaderParser {
             return None;
         }
         let mut method_info = Method::default();
-        method_info.name = method.get_display_name().unwrap();
+        method_info.name = method.get_name().unwrap();
         method_info.access = match method.get_accessibility().unwrap() {
             Accessibility::Public => AccessModifier::Public,
             Accessibility::Protected => AccessModifier::Protected,

@@ -21,7 +21,7 @@
 // * Warning prints to terminal and to a log file
 // * Error prints to both terminal and file, adding file, line and column info
 // * Fatal behaves like Error but crashes the session as well
-enum class LogSeverity : uint8_t
+enum class [[expose]] LogSeverity : uint8_t
 {
     Display = 0,
     Log,
@@ -30,8 +30,9 @@ enum class LogSeverity : uint8_t
     Fatal
 };
 
+
 // The class to use to implement categories
-class LogCategory
+class [[expose]] LogCategory
 {
 public:
     explicit LogCategory(
