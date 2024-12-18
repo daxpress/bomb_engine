@@ -1,4 +1,5 @@
 # Bomb Engine
 
- > [!NOTE]
- > Very early and sporadic development
+> 🚀 Exciting Beginnings!  
+> This project is in its foundational stages, with development progressing as time allows.
+> Stay tuned for updates as it evolves!
