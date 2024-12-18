@@ -1,3 +1,4 @@
+#include "api_bridge.h"
 #include "api_interface.h"
 #include "vulkan/api_vulkan.h"
 #include "window.h"
@@ -9,7 +10,7 @@ auto APIBridge::initialize(Window& window, bool enable_validation_layers, E_API 
     switch (desired_api)
     {
         case E_API::API_VULKAN:
-            m_current_api = new APIVulkan(window, enable_validation_layers);
+            m_current_api = std::make_unique<APIVulkan>(window, enable_validation_layers);
             return true;
             break;
         case E_API::API_DIRECTX:
@@ -22,12 +23,4 @@ auto APIBridge::initialize(Window& window, bool enable_validation_layers, E_API 
 }
 
 void APIBridge::draw_frame() { m_current_api->draw_frame(); }
-
-APIBridge::~APIBridge()
-{
-    if (m_current_api)
-    {
-        delete m_current_api;
-    }
-}
 }  // namespace BE_NAMESPACE

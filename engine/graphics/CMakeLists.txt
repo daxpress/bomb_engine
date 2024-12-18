@@ -7,7 +7,7 @@ target_sources(bomb_engine_graphics
         PRIVATE
         FILE_SET HEADERS FILES
         "renderer.h" "window.h" "api_bridge.h" "graphics_pipeline_type.h" "api_interface.h"
-        "spirv_shader.h" "vertex_data.h"
+        "spirv_shader.h" "vertex_data.h" "e_api.h"
         "mesh.h")
 
 add_subdirectory(vulkan)
