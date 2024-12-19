@@ -1,3 +1,5 @@
+mod cpp_reflection;
+
 use rayon::prelude::*;
 use std::fs::{self, File};
 use std::path::Path;
@@ -68,8 +70,8 @@ impl<'a> Generator <'a> {
         let file_path = Self::generated_header_filepath(&parsed_unit.name, module);
         let file_path = Path::new(&file_path);
         let _file = File::create(file_path).unwrap();
-        // TODO:
-        // create the headers with the serialized data - still thinking about the implementation
+        // create the headers with the serialized data
+        // TODO: use refl-cpp library to reflect code!
     }
 
     fn generate_json(parsed_unit: &Namespace, module: &str) {

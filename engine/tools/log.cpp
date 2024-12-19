@@ -38,19 +38,14 @@ static auto get_log_type_string(const LogSeverity severity) -> std::string
     {
         case LogSeverity::Display:
             return "Display";
-            break;
         case LogSeverity::Log:
             return "Log";
-            break;
         case LogSeverity::Warning:
             return "Warning";
-            break;
         case LogSeverity::Error:
             return "Error";
-            break;
         case LogSeverity::Fatal:
             return "Fatal";
-            break;
     }
     return "";
 }
