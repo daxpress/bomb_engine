@@ -224,12 +224,12 @@ APIVulkan::~APIVulkan()
     m_device->destroySampler(m_example_sampler);
 
     // drop the buffers to destroy before the device is (current use, it WILL change)
-    m_model_vb = nullptr;
-    m_model_ib = nullptr;
+    m_model_ib.reset();
+    m_model_vb.reset();
 
     for (auto& ub : m_uniform_buffers)
     {
-        ub = nullptr;
+        ub.reset();
     }
 
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)

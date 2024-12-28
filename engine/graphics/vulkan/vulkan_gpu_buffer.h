@@ -58,42 +58,9 @@ class VulkanGpuBuffer
           m_command_pool(command_pool) {};
 
 public:
-    VulkanGpuBuffer(VulkanGpuBuffer&& other) noexcept
-        : m_size(other.m_size),
-          m_usage(other.m_usage),
-          m_sharing_mode(other.m_sharing_mode),
-          m_properties(other.m_properties),
-          m_buffer(std::move(other.m_buffer)),
-          m_memory(std::move(other.m_memory)),
-          m_device(std::move(other.m_device)),
-          m_command_pool(std::move(other.m_command_pool))
-    {
-        // invalidate m_device so that it doesn't touch the gpu memory
-        other.m_device = nullptr;
-    };
-    VulkanGpuBuffer& operator=(VulkanGpuBuffer&& other) noexcept
-    {
-        if (this != &other)
-        {
-            m_buffer = std::move(other.m_buffer);
-            m_memory = std::move(other.m_memory);
-            m_command_pool = std::move(other.m_command_pool);
-            m_device = std::move(other.m_device);
-            m_usage = other.m_usage;
-            m_sharing_mode = other.m_sharing_mode;
-            m_properties = other.m_properties;
-            m_size = other.m_size;  // Reset 'other' to a valid state
-            other.m_buffer = nullptr;
-            other.m_memory = nullptr;
-            other.m_command_pool = nullptr;
-            other.m_device = nullptr;
-            other.m_usage = {};
-            other.m_sharing_mode = {};
-            other.m_properties = {};
-            other.m_size = 0;
-        }
-        return *this;
-    }
+    VulkanGpuBuffer(VulkanGpuBuffer&& other) noexcept;
+
+    VulkanGpuBuffer& operator=(VulkanGpuBuffer&& other) noexcept;
 
     [[nodiscard]] auto copy_to(const VulkanGpuBuffer& other, const vk::Queue& queue) const -> bool;
 

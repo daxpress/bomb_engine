@@ -33,6 +33,44 @@ auto VulkanGpuBufferFactory::create(
     return std::make_shared<VulkanGpuBuffer>(std::move(new_buffer));
 }
 
+VulkanGpuBuffer::VulkanGpuBuffer(VulkanGpuBuffer&& other) noexcept
+    : m_size(other.m_size),
+      m_usage(other.m_usage),
+      m_sharing_mode(other.m_sharing_mode),
+      m_properties(other.m_properties),
+      m_buffer(std::move(other.m_buffer)),
+      m_memory(std::move(other.m_memory)),
+      m_device(std::move(other.m_device)),
+      m_command_pool(std::move(other.m_command_pool))
+{
+    // invalidate m_device so that it doesn't touch the gpu memory
+    other.m_device = nullptr;
+}
+
+VulkanGpuBuffer& VulkanGpuBuffer::operator=(VulkanGpuBuffer&& other) noexcept
+{
+    if (this != &other)
+    {
+        m_buffer = std::move(other.m_buffer);
+        m_memory = std::move(other.m_memory);
+        m_command_pool = std::move(other.m_command_pool);
+        m_device = std::move(other.m_device);
+        m_usage = other.m_usage;
+        m_sharing_mode = other.m_sharing_mode;
+        m_properties = other.m_properties;
+        m_size = other.m_size;  // Reset 'other' to a valid state
+        other.m_buffer = nullptr;
+        other.m_memory = nullptr;
+        other.m_command_pool.reset();
+        other.m_device.reset();
+        other.m_usage = {};
+        other.m_sharing_mode = {};
+        other.m_properties = {};
+        other.m_size = 0;
+    }
+    return *this;
+}
+
 auto VulkanGpuBuffer::copy_to(const VulkanGpuBuffer& other, const vk::Queue& queue) const -> bool
 {
     if (other.m_size < m_size)
