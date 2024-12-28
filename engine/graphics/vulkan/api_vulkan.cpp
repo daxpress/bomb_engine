@@ -1333,7 +1333,7 @@ void APIVulkan::create_example_texture()
         stbi_load("assets/textures/viking_room.png", &width, &height, &channels, STBI_rgb_alpha);
     size_t buffer_size = width * height * 4;
 
-    auto pixels_array = std::vector(pixels, pixels + buffer_size);
+    auto pixels_array = std::span(pixels, pixels + buffer_size);
 
     uint32_t miplevels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
     m_example_mips = miplevels;
