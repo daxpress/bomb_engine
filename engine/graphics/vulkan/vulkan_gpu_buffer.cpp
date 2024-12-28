@@ -6,6 +6,19 @@
 namespace BE_NAMESPACE
 {
 
+VulkanGpuBufferFactory::VulkanGpuBufferFactory(
+    const std::vector<uint32_t>& families,
+    std::shared_ptr<vk::PhysicalDevice> physical_device,
+    std::shared_ptr<vk::Device> device,
+    std::shared_ptr<vk::CommandPool> command_pool
+)
+    : m_families(families),
+      m_device(device),
+      m_physical_device(physical_device),
+      m_command_pool(command_pool)
+{
+}
+
 auto VulkanGpuBufferFactory::create(
     const uint32_t size,
     const vk::BufferUsageFlags usage,
@@ -31,6 +44,27 @@ auto VulkanGpuBufferFactory::create(
         buffer, buffer_memory, m_command_pool, m_device, usage, sharing_mode, properties, size
     );
     return std::make_shared<VulkanGpuBuffer>(std::move(new_buffer));
+}
+
+VulkanGpuBuffer::VulkanGpuBuffer(
+    vk::Buffer buffer,
+    vk::DeviceMemory memory,
+    std::shared_ptr<vk::CommandPool> command_pool,
+    std::shared_ptr<vk::Device> device,
+    const vk::BufferUsageFlags usage,
+    const vk::SharingMode sharing_mode,
+    const vk::MemoryPropertyFlags properties,
+    const uint32_t size
+)
+    : m_size(size),
+      m_usage(usage),
+      m_sharing_mode(sharing_mode),
+      m_properties(properties),
+      m_buffer(buffer),
+      m_memory(memory),
+      m_device(device),
+      m_command_pool(command_pool)
+{
 }
 
 VulkanGpuBuffer::VulkanGpuBuffer(VulkanGpuBuffer&& other) noexcept

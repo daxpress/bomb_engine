@@ -14,11 +14,7 @@ public:
         std::shared_ptr<vk::PhysicalDevice> physical_device,
         std::shared_ptr<vk::Device> device,
         std::shared_ptr<vk::CommandPool> command_pool
-    )
-        : m_families(families),
-          m_device(device),
-          m_physical_device(physical_device),
-          m_command_pool(command_pool) {};
+    );
 
     auto create(
         const uint32_t size,
@@ -47,15 +43,7 @@ class VulkanGpuBuffer
         const vk::SharingMode sharing_mode,
         const vk::MemoryPropertyFlags properties,
         const uint32_t size
-    )
-        : m_size(size),
-          m_usage(usage),
-          m_sharing_mode(sharing_mode),
-          m_properties(properties),
-          m_buffer(buffer),
-          m_memory(memory),
-          m_device(device),
-          m_command_pool(command_pool) {};
+    );
 
 public:
     VulkanGpuBuffer(VulkanGpuBuffer&& other) noexcept;
