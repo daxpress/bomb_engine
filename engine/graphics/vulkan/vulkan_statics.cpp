@@ -40,4 +40,26 @@ auto VulkanStatics::create_command_buffer(
 {
     return create_command_buffers(device, pool, level, 1)[0];
 }
+auto VulkanStatics::begin_one_time_commands(const vk::Device& device, const vk::CommandPool& pool)
+    -> vk::CommandBuffer
+{
+    const auto buffer = device.allocateCommandBuffers(
+        vk::CommandBufferAllocateInfo(pool, vk::CommandBufferLevel::ePrimary, 1)
+    )[0];  // get the first and only element
+    buffer.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+    return buffer;
+}
+void VulkanStatics::end_one_time_commands(
+    const vk::Device& device,
+    const vk::CommandBuffer& buffer,
+    const vk::Queue& queue,
+    const vk::CommandPool& pool
+)
+{
+    buffer.end();
+    queue.submit(vk::SubmitInfo(nullptr, nullptr, buffer, nullptr));
+    queue.waitIdle();
+
+    device.freeCommandBuffers(pool, buffer);
+}
 }  // namespace BE_NAMESPACE

@@ -192,9 +192,6 @@ private:
     auto create_command_pool(vk::CommandPoolCreateFlags flags, uint32_t queue_family)
         -> vk::CommandPool;
 
-    auto begin_one_time_commands(vk::CommandPool pool) -> vk::CommandBuffer;
-    void end_one_time_commands(vk::CommandBuffer buffer, vk::Queue queue, vk::CommandPool pool);
-
     void record_example_command_buffer(vk::CommandBuffer& buffer, uint32_t image_index);
 
     void create_sync_objects();

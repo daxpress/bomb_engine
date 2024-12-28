@@ -730,7 +730,7 @@ void APIVulkan::transition_image_layout(
     uint32_t mips
 )
 {
-    auto buffer = begin_one_time_commands(*m_example_command_pool);
+    auto buffer = VulkanStatics::begin_one_time_commands(*m_device, *m_example_command_pool);
 
     vk::ImageMemoryBarrier barrier{};
 
@@ -793,14 +793,16 @@ void APIVulkan::transition_image_layout(
 
     buffer.pipelineBarrier(src_stage, dst_stage, vk::DependencyFlags(), nullptr, nullptr, barrier);
 
-    end_one_time_commands(buffer, m_graphics_queue, *m_example_command_pool);
+    VulkanStatics::end_one_time_commands(
+        *m_device, buffer, m_graphics_queue, *m_example_command_pool
+    );
 }
 
 void APIVulkan::copy_buffer_to_image(
     vk::Buffer src_buffer, vk::Image image, uint32_t width, uint32_t height
 )
 {
-    auto buffer = begin_one_time_commands(*m_example_command_pool);
+    auto buffer = VulkanStatics::begin_one_time_commands(*m_device, *m_example_command_pool);
 
     vk::BufferImageCopy region(
         0,
@@ -812,7 +814,9 @@ void APIVulkan::copy_buffer_to_image(
     );
 
     buffer.copyBufferToImage(src_buffer, image, vk::ImageLayout::eTransferDstOptimal, region);
-    end_one_time_commands(buffer, m_graphics_queue, *m_example_command_pool);
+    VulkanStatics::end_one_time_commands(
+        *m_device, buffer, m_graphics_queue, *m_example_command_pool
+    );
 }
 
 auto APIVulkan::create_image_sampler(vk::Filter filter, vk::SamplerAddressMode address_mode)
@@ -854,7 +858,8 @@ void APIVulkan::generate_mipmaps(
     {
         throw std::runtime_error("texture image format does not support linear binding!");
     }
-    auto command_buffer = begin_one_time_commands(*m_example_command_pool);
+    auto command_buffer =
+        VulkanStatics::begin_one_time_commands(*m_device, *m_example_command_pool);
 
     vk::ImageMemoryBarrier barrier{};
 
@@ -934,7 +939,9 @@ void APIVulkan::generate_mipmaps(
         nullptr,
         barrier
     );
-    end_one_time_commands(command_buffer, m_graphics_queue, *m_example_command_pool);
+    VulkanStatics::end_one_time_commands(
+        *m_device, command_buffer, m_graphics_queue, *m_example_command_pool
+    );
 }
 
 auto APIVulkan::create_example_pipeline() -> vk::Pipeline
@@ -1545,26 +1552,6 @@ auto APIVulkan::create_command_pool(vk::CommandPoolCreateFlags flags, uint32_t q
     -> vk::CommandPool
 {
     return m_device->createCommandPool(vk::CommandPoolCreateInfo(flags, queue_family));
-}
-
-auto APIVulkan::begin_one_time_commands(vk::CommandPool pool) -> vk::CommandBuffer
-{
-    auto buffer = m_device->allocateCommandBuffers(
-        vk::CommandBufferAllocateInfo(pool, vk::CommandBufferLevel::ePrimary, 1)
-    )[0];  // get the first and only element
-    buffer.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-    return buffer;
-}
-
-void APIVulkan::end_one_time_commands(
-    vk::CommandBuffer buffer, vk::Queue queue, vk::CommandPool pool
-)
-{
-    buffer.end();
-    queue.submit(vk::SubmitInfo(nullptr, nullptr, buffer, nullptr));
-    queue.waitIdle();
-
-    m_device->freeCommandBuffers(pool, buffer);
 }
 
 void APIVulkan::record_example_command_buffer(vk::CommandBuffer& buffer, uint32_t image_index)
