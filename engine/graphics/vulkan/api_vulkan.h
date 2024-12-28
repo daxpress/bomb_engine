@@ -5,6 +5,7 @@
 #include "spirv_shader.h"
 #include "vulkan/api_vulkan_structs.h"
 #include "vulkan_gpu_buffer.h"
+#include "vulkan_image.h"
 #include "window.h"
 
 namespace BE_NAMESPACE
@@ -39,22 +40,18 @@ private:
     VkSurfaceKHR m_surface;
     std::shared_ptr<vk::PhysicalDevice> m_physical_device;
     std::shared_ptr<vk::Device> m_device;
-    vk::Queue m_graphics_queue;
-    vk::Queue m_present_queue;
-    vk::Queue m_transfer_queue;
-    vk::Queue m_compute_queue;
+    std::shared_ptr<vk::Queue> m_graphics_queue;
+    std::shared_ptr<vk::Queue> m_present_queue;
+    std::shared_ptr<vk::Queue> m_transfer_queue;
+    std::shared_ptr<vk::Queue> m_compute_queue;
     VkSwapchainInfo m_swapchain_info;
     std::vector<vk::Framebuffer> m_frame_buffers;
     uint32_t m_current_frame = 0;
     vk::SampleCountFlagBits m_msaa_samples = vk::SampleCountFlagBits::e1;
 
     // for pipeline
-    vk::Image m_color_image;
-    vk::ImageView m_color_image_view;
-    vk::DeviceMemory m_color_image_memory;
-    vk::Image m_depth_image;
-    vk::ImageView m_depth_image_view;
-    vk::DeviceMemory m_depth_image_memory;
+    std::shared_ptr<VulkanImage> m_color_image;
+    std::shared_ptr<VulkanImage> m_depth_image;
 
     std::vector<vk::Semaphore> m_swapchain_image_available;
     std::vector<vk::Semaphore> m_render_finished;
@@ -71,9 +68,7 @@ private:
     vk::DescriptorPool m_example_desc_pool;
     std::vector<vk::DescriptorSet> m_example_desc_sets;
     vk::Sampler m_example_sampler;
-    vk::ImageView m_example_image_view;
-    vk::Image m_example_image;
-    vk::DeviceMemory m_example_image_memory;
+    std::shared_ptr<VulkanImage> m_example_image;
     uint32_t m_example_mips;
     // model related
     std::shared_ptr<Mesh> m_model;
@@ -136,31 +131,6 @@ private:
 
     auto create_shader_module(SPIRVShader& shader) -> vk::ShaderModule;
 
-    auto create_image(
-        uint32_t width,
-        uint32_t height,
-        uint32_t mips,
-        vk::SampleCountFlagBits num_samples,
-        vk::Format format,
-        vk::ImageTiling tiling,
-        vk::ImageUsageFlags usage,
-        vk::MemoryPropertyFlags
-    ) -> std::pair<vk::Image, vk::DeviceMemory>;
-
-    void transition_image_layout(
-        vk::Image image,
-        vk::Format format,
-        vk::ImageLayout old_layout,
-        vk::ImageLayout new_layout,
-        uint32_t mips
-    );
-    void copy_buffer_to_image(vk::Buffer, vk::Image image, uint32_t width, uint32_t height);
-    auto create_image_sampler(vk::Filter filter, vk::SamplerAddressMode address_mode)
-        -> vk::Sampler;
-    void generate_mipmaps(
-        vk::Image image, vk::Format format, uint32_t width, uint32_t height, uint32_t mips
-    );
-
     // these are required to get ourselves to draw something in the editor in order to have easier
     // refactoring and feature introduction
     auto create_example_pipeline() -> vk::Pipeline;
@@ -174,23 +144,10 @@ private:
     void create_example_texture();
     void draw_example_frame();
 
-    void create_color_resources(
-        const VkSwapchainInfo& swapchain,
-        vk::Image& out_image,
-        vk::ImageView& out_img_view,
-        vk::DeviceMemory& out_memory
-    );
-    void create_depth_resources(
-        const VkSwapchainInfo& swapchain,
-        vk::Image& out_image,
-        vk::ImageView& out_img_view,
-        vk::DeviceMemory& out_memory
-    );
+    void create_color_resources(const VkSwapchainInfo& swapchain);
+    void create_depth_resources(const VkSwapchainInfo& swapchain);
     auto create_frame_buffers(VkSwapchainInfo swapchain, vk::RenderPass render_pass)
         -> std::vector<vk::Framebuffer>;
-
-    auto create_command_pool(vk::CommandPoolCreateFlags flags, uint32_t queue_family)
-        -> vk::CommandPool;
 
     void record_example_command_buffer(vk::CommandBuffer& buffer, uint32_t image_index);
 
@@ -198,6 +155,5 @@ private:
 
     auto create_descriptor_pool(vk::DescriptorType type, uint32_t size) -> vk::DescriptorPool;
     auto create_descriptor_sets(uint32_t count) -> std::vector<vk::DescriptorSet>;
-    auto has_stencil_component(vk::Format format) -> bool;
 };
 }  // namespace BE_NAMESPACE

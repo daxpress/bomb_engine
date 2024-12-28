@@ -31,5 +31,20 @@ public:
         const vk::Queue& queue,
         const vk::CommandPool& pool
     );
+
+    static auto create_command_pool(
+        const vk::Device& device,
+        const vk::CommandPoolCreateFlags flags,
+        const uint32_t queue_family
+    ) -> vk::CommandPool;
+
+    static auto has_stencil_component(vk::Format format) -> bool;
+
+    static auto create_image_sampler(
+        const vk::PhysicalDevice& physical_device,
+        const vk::Device& device,
+        const vk::Filter filter,
+        const vk::SamplerAddressMode address_mode
+    ) -> vk::Sampler;
 };
 }  // namespace BE_NAMESPACE

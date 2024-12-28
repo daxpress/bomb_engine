@@ -163,25 +163,23 @@ APIVulkan::APIVulkan(Window& window, bool enable_validation_layers)
     m_device = std::make_shared<vk::Device>(create_logical_device(*m_physical_device));
 
     auto families = get_queue_families(*m_physical_device);
-    m_graphics_queue = m_device->getQueue(families.graphics.value(), 0);
-    m_present_queue = m_device->getQueue(families.present.value(), 0);
-    m_transfer_queue = m_device->getQueue(families.transfer.value(), 0);
-    m_compute_queue = m_device->getQueue(families.compute.value(), 0);
+    m_graphics_queue =
+        std::make_shared<vk::Queue>(m_device->getQueue(families.graphics.value(), 0));
+    m_present_queue = std::make_shared<vk::Queue>(m_device->getQueue(families.present.value(), 0));
+    m_transfer_queue =
+        std::make_shared<vk::Queue>(m_device->getQueue(families.transfer.value(), 0));
+    m_compute_queue = std::make_shared<vk::Queue>(m_device->getQueue(families.compute.value(), 0));
 
     m_swapchain_info = create_swapchain(*m_physical_device, m_surface, *m_device);
 
     // example pipeline related (we will create a sample scene rendered directly
     // from here to drive abstractions for scene and renderer's APIs)
     m_example_pipeline = create_example_pipeline();
-    m_example_command_pool = std::make_shared<vk::CommandPool>(create_command_pool(
-        vk::CommandPoolCreateFlagBits::eResetCommandBuffer, families.graphics.value()
+    m_example_command_pool = std::make_shared<vk::CommandPool>(VulkanStatics::create_command_pool(
+        *m_device, vk::CommandPoolCreateFlagBits::eResetCommandBuffer, families.graphics.value()
     ));
-    create_color_resources(
-        m_swapchain_info, m_color_image, m_color_image_view, m_color_image_memory
-    );
-    create_depth_resources(
-        m_swapchain_info, m_depth_image, m_depth_image_view, m_depth_image_memory
-    );
+    create_color_resources(m_swapchain_info);
+    create_depth_resources(m_swapchain_info);
     m_frame_buffers = create_frame_buffers(m_swapchain_info, m_example_renderpass);
 
     m_model = std::make_shared<Mesh>("assets/models/viking_room.obj");
@@ -190,17 +188,10 @@ APIVulkan::APIVulkan(Window& window, bool enable_validation_layers)
     create_example_ib();
 
     create_example_texture();
-    m_example_image_view = m_device->createImageView(
-        vk::ImageViewCreateInfo(
-            vk::ImageViewCreateFlags(),
-            m_example_image,
-            vk::ImageViewType::e2D,
-            vk::Format::eR8G8B8A8Srgb,
-            {},
-            vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, m_example_mips, 0, 1)
-        )
+
+    m_example_sampler = VulkanStatics::create_image_sampler(
+        *m_physical_device, *m_device, vk::Filter::eLinear, vk::SamplerAddressMode::eRepeat
     );
-    m_example_sampler = create_image_sampler(vk::Filter::eLinear, vk::SamplerAddressMode::eRepeat);
 
     create_example_uniform_buffers();
     m_example_desc_pool =
@@ -218,9 +209,7 @@ APIVulkan::~APIVulkan()
 {
     m_device->waitIdle();
 
-    m_device->destroyImageView(m_example_image_view);
-    m_device->destroyImage(m_example_image);
-    m_device->freeMemory(m_example_image_memory);
+    m_example_image.reset();
     m_device->destroySampler(m_example_sampler);
 
     // drop the buffers to destroy before the device is (current use, it WILL change)
@@ -674,276 +663,6 @@ auto APIVulkan::create_shader_module(SPIRVShader& shader) -> vk::ShaderModule
     return m_device->createShaderModule(create_info);
 }
 
-auto APIVulkan::create_image(
-    uint32_t width,
-    uint32_t height,
-    uint32_t mips,
-    vk::SampleCountFlagBits num_samples,
-    vk::Format format,
-    vk::ImageTiling tiling,
-    vk::ImageUsageFlags usage,
-    vk::MemoryPropertyFlags props
-) -> std::pair<vk::Image, vk::DeviceMemory>
-{
-    auto indices = get_queue_families(*m_physical_device);
-    auto sharing_mode = vk::SharingMode::eExclusive;
-    std::vector<uint32_t> family_indices{};
-
-    if (indices.graphics.value() != indices.transfer.value())
-    {
-        sharing_mode = vk::SharingMode::eConcurrent;
-        family_indices = {indices.graphics.value(), indices.transfer.value()};
-    }
-
-    vk::ImageCreateInfo create_info(
-        vk::ImageCreateFlags(),
-        vk::ImageType::e2D,
-        format,
-        vk::Extent3D{width, height, 1},
-        mips,
-        1,
-        num_samples,
-        tiling,
-        usage,
-        sharing_mode,
-        family_indices
-    );
-    auto image = m_device->createImage(create_info);
-
-    auto mem_req = m_device->getImageMemoryRequirements(image);
-    vk::MemoryAllocateInfo alloc_info(
-        mem_req.size,
-        VulkanStatics::find_memory_type(*m_physical_device, mem_req.memoryTypeBits, props)
-    );
-    auto memory = m_device->allocateMemory(alloc_info);
-
-    m_device->bindImageMemory(image, memory, 0);
-
-    return {image, memory};
-}
-
-void APIVulkan::transition_image_layout(
-    vk::Image image,
-    vk::Format format,
-    vk::ImageLayout old_layout,
-    vk::ImageLayout new_layout,
-    uint32_t mips
-)
-{
-    auto buffer = VulkanStatics::begin_one_time_commands(*m_device, *m_example_command_pool);
-
-    vk::ImageMemoryBarrier barrier{};
-
-    barrier.oldLayout = old_layout;
-    barrier.newLayout = new_layout;
-    barrier.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
-    barrier.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
-    barrier.image = image;
-    if (new_layout == vk::ImageLayout::eDepthStencilAttachmentOptimal)
-    {
-        barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eDepth;
-        if (has_stencil_component(format))
-        {
-            barrier.subresourceRange.aspectMask |= vk::ImageAspectFlagBits::eStencil;
-        }
-    }
-    else
-    {
-        barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
-    }
-    barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = mips;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
-
-    vk::PipelineStageFlags src_stage;
-    vk::PipelineStageFlags dst_stage;
-
-    if (old_layout == vk::ImageLayout::eUndefined &&
-        new_layout == vk::ImageLayout::eTransferDstOptimal)
-    {
-        barrier.srcAccessMask = vk::AccessFlagBits::eNone;
-        barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
-
-        src_stage = vk::PipelineStageFlagBits::eTopOfPipe;
-        dst_stage = vk::PipelineStageFlagBits::eTransfer;
-    }
-    else if (old_layout == vk::ImageLayout::eUndefined &&
-             new_layout == vk::ImageLayout::eShaderReadOnlyOptimal)
-    {
-        barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
-        barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
-
-        src_stage = vk::PipelineStageFlagBits::eTransfer;
-        dst_stage = vk::PipelineStageFlagBits::eFragmentShader;
-    }
-    else if (old_layout == vk::ImageLayout::eUndefined &&
-             new_layout == vk::ImageLayout::eDepthStencilAttachmentOptimal)
-    {
-        barrier.srcAccessMask = vk::AccessFlagBits::eNone;
-        barrier.dstAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentRead |
-                                vk::AccessFlagBits::eDepthStencilAttachmentWrite;
-        src_stage = vk::PipelineStageFlagBits::eTopOfPipe;
-        dst_stage = vk::PipelineStageFlagBits::eEarlyFragmentTests;
-    }
-    else
-    {
-        throw std::runtime_error("unsupported layout transition!");
-    }
-
-    buffer.pipelineBarrier(src_stage, dst_stage, vk::DependencyFlags(), nullptr, nullptr, barrier);
-
-    VulkanStatics::end_one_time_commands(
-        *m_device, buffer, m_graphics_queue, *m_example_command_pool
-    );
-}
-
-void APIVulkan::copy_buffer_to_image(
-    vk::Buffer src_buffer, vk::Image image, uint32_t width, uint32_t height
-)
-{
-    auto buffer = VulkanStatics::begin_one_time_commands(*m_device, *m_example_command_pool);
-
-    vk::BufferImageCopy region(
-        0,
-        0,
-        0,
-        vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1),
-        {0, 0, 0},
-        {width, height, 1}
-    );
-
-    buffer.copyBufferToImage(src_buffer, image, vk::ImageLayout::eTransferDstOptimal, region);
-    VulkanStatics::end_one_time_commands(
-        *m_device, buffer, m_graphics_queue, *m_example_command_pool
-    );
-}
-
-auto APIVulkan::create_image_sampler(vk::Filter filter, vk::SamplerAddressMode address_mode)
-    -> vk::Sampler
-{
-    vk::SamplerCreateInfo sampler_info{};
-    sampler_info.magFilter = filter;
-    sampler_info.minFilter = filter;
-
-    sampler_info.addressModeU = address_mode;
-    sampler_info.addressModeV = address_mode;
-    sampler_info.addressModeW = address_mode;
-
-    sampler_info.anisotropyEnable = true;
-
-    auto properties = m_physical_device->getProperties();
-
-    sampler_info.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
-    sampler_info.borderColor = vk::BorderColor::eIntOpaqueBlack;
-    sampler_info.unnormalizedCoordinates = false;
-    sampler_info.compareEnable = true;
-    sampler_info.compareOp = vk::CompareOp::eAlways;
-
-    sampler_info.mipmapMode = vk::SamplerMipmapMode::eLinear;
-    sampler_info.mipLodBias = 1.0f;
-    sampler_info.minLod = 0.0f;
-    sampler_info.maxLod = vk::LodClampNone;
-
-    return m_device->createSampler(sampler_info);
-}
-
-void APIVulkan::generate_mipmaps(
-    vk::Image image, vk::Format format, uint32_t width, uint32_t height, uint32_t mips
-)
-{
-    auto properties = m_physical_device->getFormatProperties(format);
-
-    if (!(properties.optimalTilingFeatures & vk::FormatFeatureFlagBits::eSampledImageFilterLinear))
-    {
-        throw std::runtime_error("texture image format does not support linear binding!");
-    }
-    auto command_buffer =
-        VulkanStatics::begin_one_time_commands(*m_device, *m_example_command_pool);
-
-    vk::ImageMemoryBarrier barrier{};
-
-    barrier.image = image;
-    barrier.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
-    barrier.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
-    barrier.subresourceRange =
-        vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1);
-
-    int32_t mip_width = width;
-    int32_t mip_height = height;
-
-    for (uint32_t i = 1; i < mips; i++)
-    {
-        barrier.subresourceRange.baseMipLevel = i - 1;
-        barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal;
-        barrier.newLayout = vk::ImageLayout::eTransferSrcOptimal;
-        barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
-        barrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;
-
-        command_buffer.pipelineBarrier(
-            vk::PipelineStageFlagBits::eTransfer,
-            vk::PipelineStageFlagBits::eTransfer,
-            vk::DependencyFlags(),
-            nullptr,
-            nullptr,
-            barrier
-        );
-
-        vk::ImageBlit blit(
-            vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, i - 1, 0, 1),
-            {vk::Offset3D(0, 0, 0), vk::Offset3D(mip_width, mip_height, 1)},
-            vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, i, 0, 1),
-            {vk::Offset3D(0, 0, 0),
-             vk::Offset3D(mip_width > 1 ? mip_width / 2 : 1, mip_height > 1 ? mip_height / 2 : 1, 1)
-            }
-        );
-
-        command_buffer.blitImage(
-            image,
-            vk::ImageLayout::eTransferSrcOptimal,
-            image,
-            vk::ImageLayout::eTransferDstOptimal,
-            blit,
-            vk::Filter::eLinear
-        );
-
-        barrier.oldLayout = vk::ImageLayout::eTransferSrcOptimal;
-        barrier.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-        barrier.srcAccessMask = vk::AccessFlagBits::eTransferRead;
-        barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
-
-        command_buffer.pipelineBarrier(
-            vk::PipelineStageFlagBits::eTransfer,
-            vk::PipelineStageFlagBits::eFragmentShader,
-            vk::DependencyFlags(),
-            nullptr,
-            nullptr,
-            barrier
-        );
-
-        if (mip_width > 1) mip_width /= 2;
-        if (mip_height > 1) mip_height /= 2;
-    }
-
-    barrier.subresourceRange.baseMipLevel = mips - 1;
-    barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal;
-    barrier.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-    barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
-    barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
-
-    command_buffer.pipelineBarrier(
-        vk::PipelineStageFlagBits::eTransfer,
-        vk::PipelineStageFlagBits::eFragmentShader,
-        vk::DependencyFlags(),
-        nullptr,
-        nullptr,
-        barrier
-    );
-    VulkanStatics::end_one_time_commands(
-        *m_device, command_buffer, m_graphics_queue, *m_example_command_pool
-    );
-}
-
 auto APIVulkan::create_example_pipeline() -> vk::Pipeline
 {
     SPIRVShader vertex, fragment;
@@ -1193,7 +912,7 @@ void APIVulkan::create_example_vb()
         vk::MemoryPropertyFlagBits::eDeviceLocal
     );
 
-    if (!buffer->copy_to(*m_model_vb, m_graphics_queue))
+    if (!buffer->copy_to(*m_model_vb, *m_graphics_queue))
     {
         Log(VulkanAPICategory, LogSeverity::Fatal, "Failed to copy buffer");
     }
@@ -1228,7 +947,7 @@ void APIVulkan::create_example_ib()
         vk::MemoryPropertyFlagBits::eDeviceLocal
     );
 
-    if (!buffer->copy_to(*m_model_ib, m_graphics_queue))
+    if (!buffer->copy_to(*m_model_ib, *m_graphics_queue))
     {
         Log(VulkanAPICategory, LogSeverity::Fatal, "Failed to copy buffer");
     }
@@ -1310,7 +1029,7 @@ void APIVulkan::populate_example_desc_sets()
             nullptr
         );
         vk::DescriptorImageInfo img_info(
-            m_example_sampler, m_example_image_view, vk::ImageLayout::eShaderReadOnlyOptimal
+            m_example_sampler, m_example_image->view(), vk::ImageLayout::eShaderReadOnlyOptimal
         );
         writes[1] = vk::WriteDescriptorSet(
             m_example_desc_sets[i],
@@ -1356,29 +1075,27 @@ void APIVulkan::create_example_texture()
 
     stbi_image_free(pixels);
 
-    std::tie(m_example_image, m_example_image_memory) = create_image(
-        width,
-        height,
-        miplevels,
-        vk::SampleCountFlagBits::e1,
-        vk::Format::eR8G8B8A8Srgb,
-        vk::ImageTiling::eOptimal,
-        vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc |
-            vk::ImageUsageFlagBits::eSampled,
+    const auto img_factory = VulkanImageFactory(
+        families, m_physical_device, m_device, m_example_command_pool, m_graphics_queue
+    );
+
+    m_example_image = img_factory.create(
+        VulkanImageInfo{
+            .width = static_cast<uint32_t>(width),
+            .height = static_cast<uint32_t>(height),
+            .mips = miplevels,
+            .num_samples = vk::SampleCountFlagBits::e1,
+            .format = vk::Format::eR8G8B8A8Srgb,
+            .tiling = vk::ImageTiling::eOptimal,
+            .usage = vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc |
+                     vk::ImageUsageFlagBits::eSampled,
+            .layout = vk::ImageLayout::eUndefined,
+            .aspect = vk::ImageAspectFlagBits::eColor
+        },
         vk::MemoryPropertyFlagBits::eDeviceLocal
     );
-
-    transition_image_layout(
-        m_example_image,
-        vk::Format::eR8G8B8A8Srgb,
-        vk::ImageLayout::eUndefined,
-        vk::ImageLayout::eTransferDstOptimal,
-        miplevels
-    );
-
-    copy_buffer_to_image(buffer->buffer(), m_example_image, width, height);
-
-    generate_mipmaps(m_example_image, vk::Format::eR8G8B8A8Srgb, width, height, miplevels);
+    m_example_image->transition_layout(vk::ImageLayout::eTransferDstOptimal);
+    m_example_image->copy_from_buffer(*buffer);
 }
 
 void APIVulkan::draw_example_frame()
@@ -1417,7 +1134,7 @@ void APIVulkan::draw_example_frame()
 
     update_uniform_buffer(m_current_frame);
 
-    m_graphics_queue.submit(
+    m_graphics_queue->submit(
         vk::SubmitInfo(
             m_swapchain_image_available[m_current_frame],
             wait_stages,
@@ -1430,7 +1147,7 @@ void APIVulkan::draw_example_frame()
     // TODO: remove exceptions and deal with error out of date assertion.
     try
     {
-        auto present_result = m_present_queue.presentKHR(
+        auto present_result = m_present_queue->presentKHR(
             vk::PresentInfoKHR(
                 m_render_finished[m_current_frame], m_swapchain_info.swapchain, image_index
             )
@@ -1454,72 +1171,55 @@ void APIVulkan::draw_example_frame()
     m_current_frame = (m_current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
-void APIVulkan::create_color_resources(
-    const VkSwapchainInfo& swapchain,
-    vk::Image& out_image,
-    vk::ImageView& out_img_view,
-    vk::DeviceMemory& out_memory
-)
+void APIVulkan::create_color_resources(const VkSwapchainInfo& swapchain)
 {
-    std::tie(out_image, out_memory) = create_image(
-        swapchain.extent.width,
-        swapchain.extent.height,
-        1,
-        m_msaa_samples,
-        swapchain.format,
-        vk::ImageTiling::eOptimal,
-        vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransientAttachment,
-        vk::MemoryPropertyFlagBits::eDeviceLocal
+    const auto families = get_queue_families(*m_physical_device);
+    const auto img_factory = VulkanImageFactory(
+        families, m_physical_device, m_device, m_example_command_pool, m_graphics_queue
     );
 
-    out_img_view = m_device->createImageView(
-        vk::ImageViewCreateInfo{
-            vk::ImageViewCreateFlags(),
-            out_image,
-            vk::ImageViewType::e2D,
-            swapchain.format,
-            vk::ComponentMapping(),
-            vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}
-        }
+    m_color_image = img_factory.create(
+        VulkanImageInfo{
+            .width = swapchain.extent.width,
+            .height = swapchain.extent.height,
+            .mips = 1,
+            .num_samples = m_msaa_samples,
+            .format = swapchain.format,
+            .tiling = vk::ImageTiling::eOptimal,
+            .usage = vk::ImageUsageFlagBits::eColorAttachment |
+                     vk::ImageUsageFlagBits::eTransientAttachment,
+            .layout = vk::ImageLayout::eUndefined,
+            .aspect = vk::ImageAspectFlagBits::eColor,
+        },
+        vk::MemoryPropertyFlagBits::eDeviceLocal
     );
 }
 
-void APIVulkan::create_depth_resources(
-    const VkSwapchainInfo& swapchain,
-    vk::Image& out_image,
-    vk::ImageView& out_img_view,
-    vk::DeviceMemory& out_memory
-)
+void APIVulkan::create_depth_resources(const VkSwapchainInfo& swapchain)
 {
-    std::tie(out_image, out_memory) = create_image(
-        swapchain.extent.width,
-        swapchain.extent.height,
-        1,
-        m_msaa_samples,
-        DEPTH_FORMAT,  // common for depth
-        vk::ImageTiling::eOptimal,
-        vk::ImageUsageFlagBits::eDepthStencilAttachment,
+    const auto img_factory = VulkanImageFactory(
+        get_queue_families(*m_physical_device),
+        m_physical_device,
+        m_device,
+        m_example_command_pool,
+        m_graphics_queue
+    );
+
+    m_depth_image = img_factory.create(
+        VulkanImageInfo{
+            .width = swapchain.extent.width,
+            .height = swapchain.extent.height,
+            .mips = 1,
+            .num_samples = m_msaa_samples,
+            .format = DEPTH_FORMAT,
+            .tiling = vk::ImageTiling::eOptimal,
+            .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment,
+            .layout = vk::ImageLayout::eUndefined,
+            .aspect = vk::ImageAspectFlagBits::eDepth,
+        },
         vk::MemoryPropertyFlagBits::eDeviceLocal
     );
-
-    out_img_view = m_device->createImageView(
-        vk::ImageViewCreateInfo{
-            vk::ImageViewCreateFlags(),
-            out_image,
-            vk::ImageViewType::e2D,
-            DEPTH_FORMAT,
-            vk::ComponentMapping(),
-            vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1}
-        }
-    );
-
-    transition_image_layout(
-        out_image,
-        DEPTH_FORMAT,
-        vk::ImageLayout::eUndefined,
-        vk::ImageLayout::eDepthStencilAttachmentOptimal,
-        1
-    );
+    m_depth_image->transition_layout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
 }
 
 auto APIVulkan::create_frame_buffers(VkSwapchainInfo swapchain, vk::RenderPass render_pass)
@@ -1530,7 +1230,7 @@ auto APIVulkan::create_frame_buffers(VkSwapchainInfo swapchain, vk::RenderPass r
     for (int i = 0; i < frame_buffers.size(); i++)
     {
         const std::array<vk::ImageView, 3> attachments{
-            m_color_image_view, m_depth_image_view, swapchain.image_views[i]
+            m_color_image->view(), m_depth_image->view(), swapchain.image_views[i]
         };
 
         auto create_info = vk::FramebufferCreateInfo(
@@ -1546,12 +1246,6 @@ auto APIVulkan::create_frame_buffers(VkSwapchainInfo swapchain, vk::RenderPass r
     }
 
     return frame_buffers;
-}
-
-auto APIVulkan::create_command_pool(vk::CommandPoolCreateFlags flags, uint32_t queue_family)
-    -> vk::CommandPool
-{
-    return m_device->createCommandPool(vk::CommandPoolCreateInfo(flags, queue_family));
 }
 
 void APIVulkan::record_example_command_buffer(vk::CommandBuffer& buffer, uint32_t image_index)
@@ -1625,19 +1319,10 @@ auto APIVulkan::create_descriptor_sets(uint32_t count) -> std::vector<vk::Descri
     );
 }
 
-auto APIVulkan::has_stencil_component(vk::Format format) -> bool
-{
-    return format == vk::Format::eD32SfloatS8Uint || format == vk::Format::eD24UnormS8Uint;
-}
-
 void APIVulkan::cleanup_swapchain(VkSwapchainInfo& swapchain)
 {
-    m_device->destroyImageView(m_color_image_view);
-    m_device->destroyImageView(m_depth_image_view);
-    m_device->destroyImage(m_color_image);
-    m_device->destroyImage(m_depth_image);
-    m_device->freeMemory(m_color_image_memory);
-    m_device->freeMemory(m_depth_image_memory);
+    m_color_image.reset();
+    m_depth_image.reset();
 
     for (const auto& framebuffer : m_frame_buffers)
     {
@@ -1668,8 +1353,8 @@ auto APIVulkan::recreate_swapchain_and_framebuffers(
     m_device->waitIdle();
     cleanup_swapchain(m_swapchain_info);
     auto swapchain_info = create_swapchain(physical_device, surface, device, nullptr);
-    create_color_resources(swapchain_info, m_color_image, m_color_image_view, m_color_image_memory);
-    create_depth_resources(swapchain_info, m_depth_image, m_depth_image_view, m_depth_image_memory);
+    create_color_resources(swapchain_info);
+    create_depth_resources(swapchain_info);
     auto frame_buffers = create_frame_buffers(swapchain_info, render_pass);
     return {swapchain_info, frame_buffers};
 }

@@ -62,4 +62,47 @@ void VulkanStatics::end_one_time_commands(
 
     device.freeCommandBuffers(pool, buffer);
 }
+auto VulkanStatics::create_command_pool(
+    const vk::Device& device, const vk::CommandPoolCreateFlags flags, const uint32_t queue_family
+) -> vk::CommandPool
+{
+    return device.createCommandPool(vk::CommandPoolCreateInfo(flags, queue_family));
+}
+auto VulkanStatics::has_stencil_component(vk::Format format) -> bool
+{
+    return format == vk::Format::eD32SfloatS8Uint || format == vk::Format::eD24UnormS8Uint;
+}
+auto VulkanStatics::create_image_sampler(
+    const vk::PhysicalDevice& physical_device,
+    const vk::Device& device,
+    const vk::Filter filter,
+    const vk::SamplerAddressMode address_mode
+) -> vk::Sampler
+{
+    vk::SamplerCreateInfo sampler_info{};
+    sampler_info.magFilter = filter;
+    sampler_info.minFilter = filter;
+
+    sampler_info.addressModeU = address_mode;
+    sampler_info.addressModeV = address_mode;
+    sampler_info.addressModeW = address_mode;
+
+    sampler_info.anisotropyEnable = true;
+
+    auto properties = physical_device.getProperties();
+
+    sampler_info.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+    sampler_info.borderColor = vk::BorderColor::eIntOpaqueBlack;
+    sampler_info.unnormalizedCoordinates = false;
+    sampler_info.compareEnable = true;
+    sampler_info.compareOp = vk::CompareOp::eAlways;
+
+    sampler_info.mipmapMode = vk::SamplerMipmapMode::eLinear;
+    sampler_info.mipLodBias = 1.0f;
+    sampler_info.minLod = 0.0f;
+    sampler_info.maxLod = vk::LodClampNone;
+
+    return device.createSampler(sampler_info);
+}
+
 }  // namespace BE_NAMESPACE
