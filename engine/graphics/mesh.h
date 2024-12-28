@@ -10,4 +10,4 @@ public:
     std::vector<uint32_t> m_indices;
     std::vector<VertexData> m_vertices;
 };
-}
+}  // namespace BE_NAMESPACE

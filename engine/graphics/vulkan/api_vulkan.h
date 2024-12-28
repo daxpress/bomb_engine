@@ -4,6 +4,7 @@
 #include "mesh.h"
 #include "spirv_shader.h"
 #include "vulkan/api_vulkan_structs.h"
+#include "vulkan_gpu_buffer.h"
 #include "window.h"
 
 namespace BE_NAMESPACE
@@ -14,8 +15,8 @@ public:
     APIVulkan(Window& window, bool enable_validation_layers);
     ~APIVulkan() override;
 
-    inline auto get_api() -> E_API override { return E_API::API_VULKAN; }
-    inline void framebuffer_resized() { m_frame_resized = true; }
+    auto get_api() -> E_API override { return E_API::API_VULKAN; }
+    void framebuffer_resized() { m_frame_resized = true; }
 
     // testing only, I need a starting point to work from, which in this case is a model drawn to
     // the surface
@@ -30,14 +31,14 @@ private:
     const std::array<vk::ClearValue, 2> CLEAR_VALUES = {
         vk::ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f), vk::ClearDepthStencilValue(1.0f, 0.0f)
     };
-    const int MAX_FRAMES_IN_FLIGHT = 2;
+    constexpr static uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
     bool b_use_validation_layers = false;
     Window& m_window_ref;
     vk::UniqueInstance m_vulkan_instance;
     VkSurfaceKHR m_surface;
-    vk::PhysicalDevice m_physical_device;
-    vk::Device m_device;
+    std::shared_ptr<vk::PhysicalDevice> m_physical_device;
+    std::shared_ptr<vk::Device> m_device;
     vk::Queue m_graphics_queue;
     vk::Queue m_present_queue;
     vk::Queue m_transfer_queue;
@@ -65,7 +66,7 @@ private:
     vk::PipelineLayout m_example_layout;
     vk::RenderPass m_example_renderpass;
     vk::DescriptorSetLayout m_example_descriptor_set_layout;
-    vk::CommandPool m_example_command_pool;
+    std::shared_ptr<vk::CommandPool> m_example_command_pool;
     std::vector<vk::CommandBuffer> m_example_command_buffers;
     vk::DescriptorPool m_example_desc_pool;
     std::vector<vk::DescriptorSet> m_example_desc_sets;
@@ -76,14 +77,13 @@ private:
     uint32_t m_example_mips;
     // model related
     std::shared_ptr<Mesh> m_model;
-    vk::Buffer m_model_vb;
-    vk::Buffer m_model_ib;
-    vk::DeviceMemory m_model_vb_memory;
-    vk::DeviceMemory m_model_ib_memory;
+    // vk::Buffer m_model_vb;
+    // vk::Buffer m_model_ib;
+    std::shared_ptr<VulkanGpuBuffer> m_model_vb;
+    std::shared_ptr<VulkanGpuBuffer> m_model_ib;
 
-    std::vector<vk::Buffer> m_uniform_buffers;
-    std::vector<vk::DeviceMemory> m_unifform_buffers_memory;
-    std::vector<void*> m_uniform_buffers_mapped;
+    std::vector<std::shared_ptr<VulkanGpuBuffer>> m_uniform_buffers;
+    std::vector<std::any> m_uniform_buffers_mapped;
 
 private:
     void create_instance(const Window& window, bool enable_validation_layers);
@@ -104,7 +104,8 @@ private:
     /// <returns> the overall score based on the features and properties</returns>
     auto rate_physical_device(vk::PhysicalDevice physical_device) -> uint32_t;
     auto physical_device_is_suitable(vk::PhysicalDevice physical_device) -> bool;
-    auto get_queue_families(vk::PhysicalDevice physical_device) -> VkQueueFamilyIndices;
+    auto get_queue_families(const vk::PhysicalDevice& physical_device) const
+        -> VkQueueFamilyIndices;
     auto check_extensions_support(vk::PhysicalDevice physical_device) -> bool;
     auto get_sample_count() -> vk::SampleCountFlagBits;
 
@@ -127,11 +128,11 @@ private:
         vk::RenderPass render_pass
     ) -> std::tuple<VkSwapchainInfo, std::vector<vk::Framebuffer>>;
 
-    auto choose_swapchain_surface_format(std::vector<vk::SurfaceFormatKHR> formats
-    ) -> vk::SurfaceFormatKHR;
+    auto choose_swapchain_surface_format(std::vector<vk::SurfaceFormatKHR> formats)
+        -> vk::SurfaceFormatKHR;
 
-    auto choose_swapchain_present_mode(const std::vector<vk::PresentModeKHR>& present_modes
-    ) -> vk::PresentModeKHR;
+    auto choose_swapchain_present_mode(const std::vector<vk::PresentModeKHR>& present_modes)
+        -> vk::PresentModeKHR;
 
     auto choose_swapchain_extent(vk::SurfaceCapabilitiesKHR capabilities) -> vk::Extent2D;
 
@@ -148,7 +149,6 @@ private:
         vk::MemoryPropertyFlags
     ) -> std::pair<vk::Image, vk::DeviceMemory>;
 
-    auto find_memory_type(uint32_t type_bits, vk::MemoryPropertyFlags props) -> uint32_t;
     void transition_image_layout(
         vk::Image image,
         vk::Format format,
@@ -194,27 +194,21 @@ private:
     auto create_command_pool(vk::CommandPoolCreateFlags flags, uint32_t queue_family)
         -> vk::CommandPool;
 
-    auto create_command_buffers(vk::CommandPool pool, vk::CommandBufferLevel level, uint32_t count)
-        -> std::vector<vk::CommandBuffer>;
-
-    auto create_command_buffer(vk::CommandPool pool, vk::CommandBufferLevel level)
-        -> vk::CommandBuffer;
-
     auto begin_one_time_commands(vk::CommandPool pool) -> vk::CommandBuffer;
     void end_one_time_commands(vk::CommandBuffer buffer, vk::Queue queue, vk::CommandPool pool);
 
-    void record_example_command_buffer(vk::CommandBuffer buffer, uint32_t image_index);
+    void record_example_command_buffer(vk::CommandBuffer& buffer, uint32_t image_index);
 
     void create_sync_objects();
 
-    auto create_buffer(
-        uint32_t size,
-        vk::BufferUsageFlags usage,
-        vk::SharingMode sharing_mode,
-        vk::MemoryPropertyFlags properties
-    ) -> std::tuple<vk::Buffer, vk::DeviceMemory>;
+    // auto create_buffer(
+    //     uint32_t size,
+    //     vk::BufferUsageFlags usage,
+    //     vk::SharingMode sharing_mode,
+    //     vk::MemoryPropertyFlags properties
+    // ) -> std::tuple<vk::Buffer, vk::DeviceMemory>;
 
-    void copy_buffer(vk::Buffer src, vk::Buffer dst, size_t size);
+    // void copy_buffer(vk::Buffer src, vk::Buffer dst, size_t size);
 
     auto create_descriptor_pool(vk::DescriptorType type, uint32_t size) -> vk::DescriptorPool;
     auto create_descriptor_sets(uint32_t count) -> std::vector<vk::DescriptorSet>;

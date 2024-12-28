@@ -1,14 +1,16 @@
 #include "vulkan/api_vulkan.h"
-#include "vulkan/api_vulkan_internal.h"
 
 #include <chrono>
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "file_helper.h"
 #include "vertex_data.h"
+#include "vulkan/api_vulkan_internal.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+
+#include "vulkan_statics.h"
 
 // TODO: Replace exceptions with logs (can also throw exceptions but they must
 // be engine-breaking!)
@@ -155,24 +157,25 @@ APIVulkan::APIVulkan(Window& window, bool enable_validation_layers)
     glfwSetWindowUserPointer(window.get_raw_window(), this);
     glfwSetFramebufferSizeCallback(window.get_raw_window(), framebuffer_resize_callback);
 
-    m_physical_device = select_physical_device();
+    m_physical_device = std::make_shared<vk::PhysicalDevice>(select_physical_device());
     m_msaa_samples = get_sample_count();
-    m_device = create_logical_device(m_physical_device);
 
-    auto families = get_queue_families(m_physical_device);
-    m_graphics_queue = m_device.getQueue(families.graphics.value(), 0);
-    m_present_queue = m_device.getQueue(families.present.value(), 0);
-    m_transfer_queue = m_device.getQueue(families.transfer.value(), 0);
-    m_compute_queue = m_device.getQueue(families.compute.value(), 0);
+    m_device = std::make_shared<vk::Device>(create_logical_device(*m_physical_device));
 
-    m_swapchain_info = create_swapchain(m_physical_device, m_surface, m_device);
+    auto families = get_queue_families(*m_physical_device);
+    m_graphics_queue = m_device->getQueue(families.graphics.value(), 0);
+    m_present_queue = m_device->getQueue(families.present.value(), 0);
+    m_transfer_queue = m_device->getQueue(families.transfer.value(), 0);
+    m_compute_queue = m_device->getQueue(families.compute.value(), 0);
+
+    m_swapchain_info = create_swapchain(*m_physical_device, m_surface, *m_device);
 
     // example pipeline related (we will create a sample scene rendered directly
     // from here to drive abstractions for scene and renderer's APIs)
     m_example_pipeline = create_example_pipeline();
-    m_example_command_pool = create_command_pool(
+    m_example_command_pool = std::make_shared<vk::CommandPool>(create_command_pool(
         vk::CommandPoolCreateFlagBits::eResetCommandBuffer, families.graphics.value()
-    );
+    ));
     create_color_resources(
         m_swapchain_info, m_color_image, m_color_image_view, m_color_image_memory
     );
@@ -182,18 +185,21 @@ APIVulkan::APIVulkan(Window& window, bool enable_validation_layers)
     m_frame_buffers = create_frame_buffers(m_swapchain_info, m_example_renderpass);
 
     m_model = std::make_shared<Mesh>("assets/models/viking_room.obj");
+
     create_example_vb();
     create_example_ib();
 
     create_example_texture();
-    m_example_image_view = m_device.createImageView(vk::ImageViewCreateInfo(
-        vk::ImageViewCreateFlags(),
-        m_example_image,
-        vk::ImageViewType::e2D,
-        vk::Format::eR8G8B8A8Srgb,
-        {},
-        vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, m_example_mips, 0, 1)
-    ));
+    m_example_image_view = m_device->createImageView(
+        vk::ImageViewCreateInfo(
+            vk::ImageViewCreateFlags(),
+            m_example_image,
+            vk::ImageViewType::e2D,
+            vk::Format::eR8G8B8A8Srgb,
+            {},
+            vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, m_example_mips, 0, 1)
+        )
+    );
     m_example_sampler = create_image_sampler(vk::Filter::eLinear, vk::SamplerAddressMode::eRepeat);
 
     create_example_uniform_buffers();
@@ -202,50 +208,54 @@ APIVulkan::APIVulkan(Window& window, bool enable_validation_layers)
     m_example_desc_sets = create_descriptor_sets(MAX_FRAMES_IN_FLIGHT);
     populate_example_desc_sets();
 
-    m_example_command_buffers = create_command_buffers(
-        m_example_command_pool, vk::CommandBufferLevel::ePrimary, MAX_FRAMES_IN_FLIGHT
+    m_example_command_buffers = VulkanStatics::create_command_buffers(
+        *m_device, *m_example_command_pool, vk::CommandBufferLevel::ePrimary, MAX_FRAMES_IN_FLIGHT
     );
+    // m_example_command_buffers =
+    //     VulkanCommandBuffer::create<MAX_FRAMES_IN_FLIGHT>(
+    //         m_device, m_example_command_pool, vk::CommandBufferLevel::ePrimary
+    //     )
+    //         .value();
     create_sync_objects();
 }
 
 APIVulkan::~APIVulkan()
 {
-    m_device.waitIdle();
+    m_device->waitIdle();
 
-    m_device.destroyImageView(m_example_image_view);
-    m_device.destroyImage(m_example_image);
-    m_device.freeMemory(m_example_image_memory);
-    m_device.destroySampler(m_example_sampler);
+    m_device->destroyImageView(m_example_image_view);
+    m_device->destroyImage(m_example_image);
+    m_device->freeMemory(m_example_image_memory);
+    m_device->destroySampler(m_example_sampler);
 
-    m_device.destroyBuffer(m_model_ib);
-    m_device.destroyBuffer(m_model_vb);
-    m_device.freeMemory(m_model_ib_memory);
-    m_device.freeMemory(m_model_vb_memory);
+    // drop the buffers to destroy before the device is (current use, it WILL change)
+    m_model_vb = nullptr;
+    m_model_ib = nullptr;
+
+    for (auto& ub : m_uniform_buffers)
+    {
+        ub = nullptr;
+    }
 
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {
-        m_device.destroySemaphore(m_render_finished[i]);
-        m_device.destroySemaphore(m_swapchain_image_available[i]);
-        m_device.destroyFence(m_in_flight[i]);
+        m_device->destroySemaphore(m_render_finished[i]);
+        m_device->destroySemaphore(m_swapchain_image_available[i]);
+        m_device->destroyFence(m_in_flight[i]);
     }
 
-    m_device.freeCommandBuffers(m_example_command_pool, m_example_command_buffers);
-    m_device.destroyCommandPool(m_example_command_pool);
+    m_device->freeCommandBuffers(*m_example_command_pool, m_example_command_buffers);
+
+    m_device->destroyCommandPool(*m_example_command_pool);
 
     cleanup_swapchain(m_swapchain_info);
 
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-    {
-        m_device.destroyBuffer(m_uniform_buffers[i]);
-        m_device.freeMemory(m_unifform_buffers_memory[i]);
-    }
-
-    m_device.destroyPipeline(m_example_pipeline);
-    m_device.destroyRenderPass(m_example_renderpass);
-    m_device.destroyPipelineLayout(m_example_layout);
-    m_device.destroyDescriptorPool(m_example_desc_pool);
-    m_device.destroyDescriptorSetLayout(m_example_descriptor_set_layout);
-    m_device.destroy();
+    m_device->destroyPipeline(m_example_pipeline);
+    m_device->destroyRenderPass(m_example_renderpass);
+    m_device->destroyPipelineLayout(m_example_layout);
+    m_device->destroyDescriptorPool(m_example_desc_pool);
+    m_device->destroyDescriptorSetLayout(m_example_descriptor_set_layout);
+    m_device->destroy();
     vkDestroySurfaceKHR(*m_vulkan_instance, m_surface, nullptr);
 }
 
@@ -414,13 +424,20 @@ auto APIVulkan::rate_physical_device(vk::PhysicalDevice physical_device) -> uint
     return score;
 }
 
-auto APIVulkan::get_queue_families(vk::PhysicalDevice physical_device) -> VkQueueFamilyIndices
+auto APIVulkan::get_queue_families(const vk::PhysicalDevice& physical_device) const
+    -> VkQueueFamilyIndices
 {
-    VkQueueFamilyIndices families{};
+    static VkQueueFamilyIndices families{};
 
-    auto queue_families = physical_device.getQueueFamilyProperties();
+    if (families.is_complete())
+    {
+        // caching families as they will effectively not change
+        return families;
+    }
 
-    for (uint32_t family_index = 0; auto& queue_family : queue_families)
+    auto const queue_families = physical_device.getQueueFamilyProperties();
+
+    for (uint32_t family_index = 0; const auto& queue_family : queue_families)
     {
         if (queue_family.queueFlags & vk::QueueFlagBits::eGraphics)
         {
@@ -473,7 +490,7 @@ auto APIVulkan::check_extensions_support(vk::PhysicalDevice physical_device) -> 
 
 auto APIVulkan::get_sample_count() -> vk::SampleCountFlagBits
 {
-    auto properties = m_physical_device.getProperties();
+    auto properties = m_physical_device->getProperties();
     auto counts =
         properties.limits.framebufferColorSampleCounts &
         properties.limits
@@ -659,7 +676,7 @@ auto APIVulkan::create_shader_module(SPIRVShader& shader) -> vk::ShaderModule
     vk::ShaderModuleCreateInfo create_info(
         vk::ShaderModuleCreateFlagBits(), shader.get_bytes_count(), shader.get_data().data()
     );
-    return m_device.createShaderModule(create_info);
+    return m_device->createShaderModule(create_info);
 }
 
 auto APIVulkan::create_image(
@@ -673,7 +690,7 @@ auto APIVulkan::create_image(
     vk::MemoryPropertyFlags props
 ) -> std::pair<vk::Image, vk::DeviceMemory>
 {
-    auto indices = get_queue_families(m_physical_device);
+    auto indices = get_queue_families(*m_physical_device);
     auto sharing_mode = vk::SharingMode::eExclusive;
     std::vector<uint32_t> family_indices{};
 
@@ -696,32 +713,18 @@ auto APIVulkan::create_image(
         sharing_mode,
         family_indices
     );
-    auto image = m_device.createImage(create_info);
+    auto image = m_device->createImage(create_info);
 
-    auto mem_req = m_device.getImageMemoryRequirements(image);
+    auto mem_req = m_device->getImageMemoryRequirements(image);
     vk::MemoryAllocateInfo alloc_info(
-        mem_req.size, find_memory_type(mem_req.memoryTypeBits, props)
+        mem_req.size,
+        VulkanStatics::find_memory_type(*m_physical_device, mem_req.memoryTypeBits, props)
     );
-    auto memory = m_device.allocateMemory(alloc_info);
+    auto memory = m_device->allocateMemory(alloc_info);
 
-    m_device.bindImageMemory(image, memory, 0);
+    m_device->bindImageMemory(image, memory, 0);
 
     return {image, memory};
-}
-
-auto APIVulkan::find_memory_type(uint32_t type_bits, vk::MemoryPropertyFlags props) -> uint32_t
-{
-    auto pd_props = m_physical_device.getMemoryProperties();
-
-    for (uint32_t i = 0; i < pd_props.memoryTypeCount; i++)
-    {
-        if (type_bits & (1 << i) && (pd_props.memoryTypes[i].propertyFlags & props) == props)
-        {
-            return i;
-        }
-    }
-
-    throw std::runtime_error("failed to find suitable memory type!");
 }
 
 void APIVulkan::transition_image_layout(
@@ -732,7 +735,7 @@ void APIVulkan::transition_image_layout(
     uint32_t mips
 )
 {
-    auto buffer = begin_one_time_commands(m_example_command_pool);
+    auto buffer = begin_one_time_commands(*m_example_command_pool);
 
     vk::ImageMemoryBarrier barrier{};
 
@@ -770,7 +773,8 @@ void APIVulkan::transition_image_layout(
         src_stage = vk::PipelineStageFlagBits::eTopOfPipe;
         dst_stage = vk::PipelineStageFlagBits::eTransfer;
     }
-    else if (old_layout == vk::ImageLayout::eUndefined && new_layout == vk::ImageLayout::eShaderReadOnlyOptimal)
+    else if (old_layout == vk::ImageLayout::eUndefined &&
+             new_layout == vk::ImageLayout::eShaderReadOnlyOptimal)
     {
         barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
         barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
@@ -778,7 +782,8 @@ void APIVulkan::transition_image_layout(
         src_stage = vk::PipelineStageFlagBits::eTransfer;
         dst_stage = vk::PipelineStageFlagBits::eFragmentShader;
     }
-    else if (old_layout == vk::ImageLayout::eUndefined && new_layout == vk::ImageLayout::eDepthStencilAttachmentOptimal)
+    else if (old_layout == vk::ImageLayout::eUndefined &&
+             new_layout == vk::ImageLayout::eDepthStencilAttachmentOptimal)
     {
         barrier.srcAccessMask = vk::AccessFlagBits::eNone;
         barrier.dstAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentRead |
@@ -793,14 +798,14 @@ void APIVulkan::transition_image_layout(
 
     buffer.pipelineBarrier(src_stage, dst_stage, vk::DependencyFlags(), nullptr, nullptr, barrier);
 
-    end_one_time_commands(buffer, m_graphics_queue, m_example_command_pool);
+    end_one_time_commands(buffer, m_graphics_queue, *m_example_command_pool);
 }
 
 void APIVulkan::copy_buffer_to_image(
     vk::Buffer src_buffer, vk::Image image, uint32_t width, uint32_t height
 )
 {
-    auto buffer = begin_one_time_commands(m_example_command_pool);
+    auto buffer = begin_one_time_commands(*m_example_command_pool);
 
     vk::BufferImageCopy region(
         0,
@@ -812,7 +817,7 @@ void APIVulkan::copy_buffer_to_image(
     );
 
     buffer.copyBufferToImage(src_buffer, image, vk::ImageLayout::eTransferDstOptimal, region);
-    end_one_time_commands(buffer, m_graphics_queue, m_example_command_pool);
+    end_one_time_commands(buffer, m_graphics_queue, *m_example_command_pool);
 }
 
 auto APIVulkan::create_image_sampler(vk::Filter filter, vk::SamplerAddressMode address_mode)
@@ -828,7 +833,7 @@ auto APIVulkan::create_image_sampler(vk::Filter filter, vk::SamplerAddressMode a
 
     sampler_info.anisotropyEnable = true;
 
-    auto properties = m_physical_device.getProperties();
+    auto properties = m_physical_device->getProperties();
 
     sampler_info.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
     sampler_info.borderColor = vk::BorderColor::eIntOpaqueBlack;
@@ -841,20 +846,20 @@ auto APIVulkan::create_image_sampler(vk::Filter filter, vk::SamplerAddressMode a
     sampler_info.minLod = 0.0f;
     sampler_info.maxLod = vk::LodClampNone;
 
-    return m_device.createSampler(sampler_info);
+    return m_device->createSampler(sampler_info);
 }
 
 void APIVulkan::generate_mipmaps(
     vk::Image image, vk::Format format, uint32_t width, uint32_t height, uint32_t mips
 )
 {
-    auto properties = m_physical_device.getFormatProperties(format);
+    auto properties = m_physical_device->getFormatProperties(format);
 
     if (!(properties.optimalTilingFeatures & vk::FormatFeatureFlagBits::eSampledImageFilterLinear))
     {
         throw std::runtime_error("texture image format does not support linear binding!");
     }
-    auto command_buffer = begin_one_time_commands(m_example_command_pool);
+    auto command_buffer = begin_one_time_commands(*m_example_command_pool);
 
     vk::ImageMemoryBarrier barrier{};
 
@@ -934,7 +939,7 @@ void APIVulkan::generate_mipmaps(
         nullptr,
         barrier
     );
-    end_one_time_commands(command_buffer, m_graphics_queue, m_example_command_pool);
+    end_one_time_commands(command_buffer, m_graphics_queue, *m_example_command_pool);
 }
 
 auto APIVulkan::create_example_pipeline() -> vk::Pipeline
@@ -1054,14 +1059,14 @@ auto APIVulkan::create_example_pipeline() -> vk::Pipeline
         0
     );
 
-    auto pipeline_res = m_device.createGraphicsPipeline(nullptr, pipeline);
+    auto pipeline_res = m_device->createGraphicsPipeline(nullptr, pipeline);
     if (pipeline_res.result != vk::Result::eSuccess)
     {
         throw std::runtime_error("failed to create graphics pipeline!");
     }
 
-    m_device.destroyShaderModule(vertex_shader);
-    m_device.destroyShaderModule(fragment_shader);
+    m_device->destroyShaderModule(vertex_shader);
+    m_device->destroyShaderModule(fragment_shader);
 
     return pipeline_res.value;
 }
@@ -1132,7 +1137,7 @@ auto APIVulkan::create_example_render_pass() -> vk::RenderPass
         vk::RenderPassCreateFlagBits(), attachments, subpass, dependency
     );
 
-    return m_device.createRenderPass(render_pass_info);
+    return m_device->createRenderPass(render_pass_info);
 }
 auto APIVulkan::create_example_pipeline_layout() -> vk::PipelineLayout
 {
@@ -1148,89 +1153,113 @@ auto APIVulkan::create_example_pipeline_layout() -> vk::PipelineLayout
     vk::DescriptorSetLayoutCreateInfo layout_info(
         vk::DescriptorSetLayoutCreateFlagBits(), bindings
     );
-    m_example_descriptor_set_layout = m_device.createDescriptorSetLayout(layout_info);
+    m_example_descriptor_set_layout = m_device->createDescriptorSetLayout(layout_info);
 
     vk::PipelineLayoutCreateInfo pipeline_layout(
         vk::PipelineLayoutCreateFlagBits(), m_example_descriptor_set_layout
     );
 
-    return m_device.createPipelineLayout(pipeline_layout);
+    return m_device->createPipelineLayout(pipeline_layout);
 }
 
 void APIVulkan::create_example_vb()
 {
-    auto size = m_model->m_vertices.size() * sizeof(m_model->m_vertices[0]);
+    const auto size = m_model->m_vertices.size() * sizeof(VertexData);
 
-    auto [buffer, buffermem] = create_buffer(
+    const auto families = get_queue_families(*m_physical_device);
+
+    VulkanGpuBufferFactory buff_factory(
+        {families.graphics.value(), families.transfer.value(), families.compute.value()},
+        m_physical_device,
+        m_device,
+        m_example_command_pool
+    );
+
+    const auto buffer = buff_factory.create(
         size,
         vk::BufferUsageFlagBits::eTransferSrc,
         vk::SharingMode::eExclusive,
         vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible
     );
 
-    auto data = m_device.mapMemory(buffermem, 0, size);
-    memcpy(data, m_model->m_vertices.data(), size);
-    m_device.unmapMemory(buffermem);
+    // const auto data = m_device->mapMemory(buffer->memory(), 0, size);
+    // memcpy(data, m_model->m_vertices.data(), size);
+    // m_device->unmapMemory(buffer->memory());
+    buffer->set_data<VertexData>(m_model->m_vertices);
 
-    std::tie(m_model_vb, m_model_vb_memory) = create_buffer(
+    m_model_vb = buff_factory.create(
         size,
         vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
         vk::SharingMode::eExclusive,
         vk::MemoryPropertyFlagBits::eDeviceLocal
     );
 
-    copy_buffer(buffer, m_model_vb, size);
-
-    m_device.destroyBuffer(buffer);
-    m_device.freeMemory(buffermem);
+    if (!buffer->copy_to(*m_model_vb, m_graphics_queue))
+    {
+        Log(VulkanAPICategory, LogSeverity::Fatal, "Failed to copy buffer");
+    }
 }
 
 void APIVulkan::create_example_ib()
 {
-    auto size = m_model->m_indices.size() * sizeof(m_model->m_indices[0]);
+    const auto size = m_model->m_indices.size() * sizeof(uint32_t);
 
-    auto [buffer, buffermem] = create_buffer(
+    const auto families = get_queue_families(*m_physical_device);
+
+    VulkanGpuBufferFactory buff_factory(
+        {families.graphics.value(), families.transfer.value(), families.compute.value()},
+        m_physical_device,
+        m_device,
+        m_example_command_pool
+    );
+
+    const auto buffer = buff_factory.create(
         size,
         vk::BufferUsageFlagBits::eTransferSrc,
         vk::SharingMode::eExclusive,
         vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible
     );
 
-    auto data = m_device.mapMemory(buffermem, 0, size);
-    memcpy(data, m_model->m_indices.data(), size);
-    m_device.unmapMemory(buffermem);
+    buffer->set_data<uint32_t>(m_model->m_indices);
 
-    std::tie(m_model_ib, m_model_ib_memory) = create_buffer(
+    m_model_ib = buff_factory.create(
         size,
         vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
         vk::SharingMode::eExclusive,
         vk::MemoryPropertyFlagBits::eDeviceLocal
     );
 
-    copy_buffer(buffer, m_model_ib, size);
-
-    m_device.destroyBuffer(buffer);
-    m_device.freeMemory(buffermem);
+    if (!buffer->copy_to(*m_model_ib, m_graphics_queue))
+    {
+        Log(VulkanAPICategory, LogSeverity::Fatal, "Failed to copy buffer");
+    }
 }
 
 void APIVulkan::create_example_uniform_buffers()
 {
-    size_t size = sizeof(UniformBufferObject);
+    const size_t size = sizeof(UniformBufferObject);
+
+    const auto families = get_queue_families(*m_physical_device);
+    VulkanGpuBufferFactory buff_factory(
+        {families.graphics.value(), families.transfer.value(), families.compute.value()},
+        m_physical_device,
+        m_device,
+        m_example_command_pool
+    );
 
     m_uniform_buffers.resize(MAX_FRAMES_IN_FLIGHT);
-    m_unifform_buffers_memory.resize(MAX_FRAMES_IN_FLIGHT);
     m_uniform_buffers_mapped.resize(MAX_FRAMES_IN_FLIGHT);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {
-        std::tie(m_uniform_buffers[i], m_unifform_buffers_memory[i]) = create_buffer(
+        m_uniform_buffers[i] = buff_factory.create(
             size,
             vk::BufferUsageFlagBits::eUniformBuffer,
             vk::SharingMode::eExclusive,
             vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
         );
         m_uniform_buffers_mapped[i] =
-            m_device.mapMemory(m_unifform_buffers_memory[i], 0, size, vk::MemoryMapFlags());
+            m_device->mapMemory(m_uniform_buffers[i]->memory(), 0, size, vk::MemoryMapFlags());
     }
 }
 
@@ -1256,7 +1285,11 @@ void APIVulkan::update_uniform_buffer(uint32_t image_index)
     );
     ubo.projection[1][1] *= -1;
 
-    memcpy(m_uniform_buffers_mapped[image_index], &ubo, sizeof(UniformBufferObject));
+    memcpy(
+        std::any_cast<void*>(m_uniform_buffers_mapped[image_index]),
+        &ubo,
+        sizeof(UniformBufferObject)
+    );
 }
 
 void APIVulkan::populate_example_desc_sets()
@@ -1265,7 +1298,9 @@ void APIVulkan::populate_example_desc_sets()
     {
         std::array<vk::WriteDescriptorSet, 2> writes{};
 
-        vk::DescriptorBufferInfo buffer_info(m_uniform_buffers[i], 0, sizeof(UniformBufferObject));
+        vk::DescriptorBufferInfo buffer_info(
+            m_uniform_buffers[i]->buffer(), 0, sizeof(UniformBufferObject)
+        );
         writes[0] = vk::WriteDescriptorSet(
             m_example_desc_sets[i],
             0,
@@ -1287,7 +1322,7 @@ void APIVulkan::populate_example_desc_sets()
             nullptr,
             nullptr
         );
-        m_device.updateDescriptorSets(writes, nullptr);
+        m_device->updateDescriptorSets(writes, nullptr);
     }
 }
 
@@ -1298,6 +1333,8 @@ void APIVulkan::create_example_texture()
         stbi_load("assets/textures/viking_room.png", &width, &height, &channels, STBI_rgb_alpha);
     size_t buffer_size = width * height * 4;
 
+    auto pixels_array = std::vector(pixels, pixels + buffer_size);
+
     uint32_t miplevels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
     m_example_mips = miplevels;
 
@@ -1306,16 +1343,26 @@ void APIVulkan::create_example_texture()
         throw std::runtime_error("failed to load texture image!");
     }
 
-    auto [buffer, buffer_mem] = create_buffer(
+    const auto families = get_queue_families(*m_physical_device);
+
+    auto factory = VulkanGpuBufferFactory(
+        {families.graphics.value(), families.transfer.value(), families.compute.value()},
+        m_physical_device,
+        m_device,
+        m_example_command_pool
+    );
+    auto buffer = factory.create(
         buffer_size,
         vk::BufferUsageFlagBits::eTransferSrc,
         vk::SharingMode::eExclusive,
         vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible
     );
+    //
+    // auto data = m_device->mapMemory(buffer_mem, 0, buffer_size);
+    // memcpy(data, pixels, buffer_size);
+    // m_device->unmapMemory(buffer_mem);
 
-    auto data = m_device.mapMemory(buffer_mem, 0, buffer_size);
-    memcpy(data, pixels, buffer_size);
-    m_device.unmapMemory(buffer_mem);
+    buffer->set_data<stbi_uc>(pixels_array);
 
     stbi_image_free(pixels);
 
@@ -1338,21 +1385,19 @@ void APIVulkan::create_example_texture()
         vk::ImageLayout::eTransferDstOptimal,
         miplevels
     );
-    copy_buffer_to_image(buffer, m_example_image, width, height);
+
+    copy_buffer_to_image(buffer->buffer(), m_example_image, width, height);
 
     generate_mipmaps(m_example_image, vk::Format::eR8G8B8A8Srgb, width, height, miplevels);
-
-    m_device.destroyBuffer(buffer);
-    m_device.freeMemory(buffer_mem);
 }
 
 void APIVulkan::draw_example_frame()
 {
-    auto result = m_device.waitForFences(
+    auto result = m_device->waitForFences(
         m_in_flight[m_current_frame], true, std::numeric_limits<uint64_t>().max()
     );
 
-    auto [image_index_result, image_index] = m_device.acquireNextImageKHR(
+    auto [image_index_result, image_index] = m_device->acquireNextImageKHR(
         m_swapchain_info.swapchain,
         std::numeric_limits<uint64_t>().max(),
         m_swapchain_image_available[m_current_frame],
@@ -1362,7 +1407,7 @@ void APIVulkan::draw_example_frame()
     if (image_index_result == vk::Result::eErrorOutOfDateKHR)
     {
         std::tie(m_swapchain_info, m_frame_buffers) = recreate_swapchain_and_framebuffers(
-            m_physical_device, m_surface, m_device, nullptr, m_example_renderpass
+            *m_physical_device, m_surface, *m_device, nullptr, m_example_renderpass
         );
         return;
     }
@@ -1370,7 +1415,7 @@ void APIVulkan::draw_example_frame()
     {
         throw std::runtime_error("failed to acquire swap chain image!");
     }
-    m_device.resetFences(m_in_flight[m_current_frame]);
+    m_device->resetFences(m_in_flight[m_current_frame]);
 
     m_example_command_buffers[m_current_frame].reset();
 
@@ -1395,14 +1440,16 @@ void APIVulkan::draw_example_frame()
     // TODO: remove exceptions and deal with error out of date assertion.
     try
     {
-        auto present_result = m_present_queue.presentKHR(vk::PresentInfoKHR(
-            m_render_finished[m_current_frame], m_swapchain_info.swapchain, image_index
-        ));
+        auto present_result = m_present_queue.presentKHR(
+            vk::PresentInfoKHR(
+                m_render_finished[m_current_frame], m_swapchain_info.swapchain, image_index
+            )
+        );
         if (present_result == vk::Result::eSuboptimalKHR || m_frame_resized)
         {
             m_frame_resized = false;
             std::tie(m_swapchain_info, m_frame_buffers) = recreate_swapchain_and_framebuffers(
-                m_physical_device, m_surface, m_device, nullptr, m_example_renderpass
+                *m_physical_device, m_surface, *m_device, nullptr, m_example_renderpass
             );
         }
     }
@@ -1410,7 +1457,7 @@ void APIVulkan::draw_example_frame()
     {
         m_frame_resized = false;
         std::tie(m_swapchain_info, m_frame_buffers) = recreate_swapchain_and_framebuffers(
-            m_physical_device, m_surface, m_device, nullptr, m_example_renderpass
+            *m_physical_device, m_surface, *m_device, nullptr, m_example_renderpass
         );
     }
 
@@ -1435,14 +1482,16 @@ void APIVulkan::create_color_resources(
         vk::MemoryPropertyFlagBits::eDeviceLocal
     );
 
-    out_img_view = m_device.createImageView(vk::ImageViewCreateInfo{
-        vk::ImageViewCreateFlags(),
-        out_image,
-        vk::ImageViewType::e2D,
-        swapchain.format,
-        vk::ComponentMapping(),
-        vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}
-    });
+    out_img_view = m_device->createImageView(
+        vk::ImageViewCreateInfo{
+            vk::ImageViewCreateFlags(),
+            out_image,
+            vk::ImageViewType::e2D,
+            swapchain.format,
+            vk::ComponentMapping(),
+            vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}
+        }
+    );
 }
 
 void APIVulkan::create_depth_resources(
@@ -1463,14 +1512,16 @@ void APIVulkan::create_depth_resources(
         vk::MemoryPropertyFlagBits::eDeviceLocal
     );
 
-    out_img_view = m_device.createImageView(vk::ImageViewCreateInfo{
-        vk::ImageViewCreateFlags(),
-        out_image,
-        vk::ImageViewType::e2D,
-        DEPTH_FORMAT,
-        vk::ComponentMapping(),
-        vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1}
-    });
+    out_img_view = m_device->createImageView(
+        vk::ImageViewCreateInfo{
+            vk::ImageViewCreateFlags(),
+            out_image,
+            vk::ImageViewType::e2D,
+            DEPTH_FORMAT,
+            vk::ComponentMapping(),
+            vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1}
+        }
+    );
 
     transition_image_layout(
         out_image,
@@ -1501,7 +1552,7 @@ auto APIVulkan::create_frame_buffers(VkSwapchainInfo swapchain, vk::RenderPass r
             1,
             nullptr
         );
-        frame_buffers[i] = m_device.createFramebuffer(create_info);
+        frame_buffers[i] = m_device->createFramebuffer(create_info);
     }
 
     return frame_buffers;
@@ -1510,25 +1561,12 @@ auto APIVulkan::create_frame_buffers(VkSwapchainInfo swapchain, vk::RenderPass r
 auto APIVulkan::create_command_pool(vk::CommandPoolCreateFlags flags, uint32_t queue_family)
     -> vk::CommandPool
 {
-    return m_device.createCommandPool(vk::CommandPoolCreateInfo(flags, queue_family));
-}
-
-auto APIVulkan::create_command_buffers(
-    vk::CommandPool pool, vk::CommandBufferLevel level, uint32_t count
-) -> std::vector<vk::CommandBuffer>
-{
-    return m_device.allocateCommandBuffers(vk::CommandBufferAllocateInfo(pool, level, count));
-}
-
-auto APIVulkan::create_command_buffer(vk::CommandPool pool, vk::CommandBufferLevel level)
-    -> vk::CommandBuffer
-{
-    return create_command_buffers(pool, level, 1)[0];
+    return m_device->createCommandPool(vk::CommandPoolCreateInfo(flags, queue_family));
 }
 
 auto APIVulkan::begin_one_time_commands(vk::CommandPool pool) -> vk::CommandBuffer
 {
-    auto buffer = m_device.allocateCommandBuffers(
+    auto buffer = m_device->allocateCommandBuffers(
         vk::CommandBufferAllocateInfo(pool, vk::CommandBufferLevel::ePrimary, 1)
     )[0];  // get the first and only element
     buffer.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
@@ -1543,10 +1581,10 @@ void APIVulkan::end_one_time_commands(
     queue.submit(vk::SubmitInfo(nullptr, nullptr, buffer, nullptr));
     queue.waitIdle();
 
-    m_device.freeCommandBuffers(pool, buffer);
+    m_device->freeCommandBuffers(pool, buffer);
 }
 
-void APIVulkan::record_example_command_buffer(vk::CommandBuffer buffer, uint32_t image_index)
+void APIVulkan::record_example_command_buffer(vk::CommandBuffer& buffer, uint32_t image_index)
 {
     buffer.begin(vk::CommandBufferBeginInfo());
 
@@ -1562,8 +1600,8 @@ void APIVulkan::record_example_command_buffer(vk::CommandBuffer buffer, uint32_t
 
     buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, m_example_pipeline);
     std::array<size_t, 1> offsets = {0};
-    buffer.bindVertexBuffers(0, m_model_vb, offsets);
-    buffer.bindIndexBuffer(m_model_ib, 0, vk::IndexType::eUint32);
+    buffer.bindVertexBuffers(0, m_model_vb->buffer(), offsets);
+    buffer.bindIndexBuffer(m_model_ib->buffer(), 0, vk::IndexType::eUint32);
 
     auto viewport = vk::Viewport(
         0.0f, 0.0f, m_swapchain_info.extent.width, m_swapchain_info.extent.height, 0.0f, 1.0f
@@ -1583,7 +1621,6 @@ void APIVulkan::record_example_command_buffer(vk::CommandBuffer buffer, uint32_t
     buffer.drawIndexed(m_model->m_indices.size(), 1, 0, 0, 0);
 
     buffer.endRenderPass();
-
     buffer.end();
 }
 
@@ -1595,61 +1632,62 @@ void APIVulkan::create_sync_objects()
 
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {
-        m_swapchain_image_available[i] = m_device.createSemaphore(vk::SemaphoreCreateInfo());
-        m_render_finished[i] = m_device.createSemaphore(vk::SemaphoreCreateInfo());
+        m_swapchain_image_available[i] = m_device->createSemaphore(vk::SemaphoreCreateInfo());
+        m_render_finished[i] = m_device->createSemaphore(vk::SemaphoreCreateInfo());
         m_in_flight[i] =
-            m_device.createFence(vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
+            m_device->createFence(vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
     }
 }
-auto APIVulkan::create_buffer(
-    uint32_t size,
-    vk::BufferUsageFlags usage,
-    vk::SharingMode sharing_mode,
-    vk::MemoryPropertyFlags properties
-) -> std::tuple<vk::Buffer, vk::DeviceMemory>
-{
-    auto families = get_queue_families(m_physical_device);
-    const std::array<uint32_t, 3> used_families = {
-        families.graphics.value(), families.transfer.value(), families.compute.value()
-    };
+// auto APIVulkan::create_buffer(
+//     uint32_t size,
+//     vk::BufferUsageFlags usage,
+//     vk::SharingMode sharing_mode,
+//     vk::MemoryPropertyFlags properties
+// ) -> std::tuple<vk::Buffer, vk::DeviceMemory>
+// {
+//     auto buffer = m_device->createBuffer(
+//         vk::BufferCreateInfo(vk::BufferCreateFlags(), size, usage, sharing_mode, used_families)
+//     );
+//
+//     auto mem_req = m_device->getBufferMemoryRequirements(buffer);
+//
+//     auto buffer_memory = m_device->allocateMemory(
+//         vk::MemoryAllocateInfo(
+//             mem_req.size,
+//             VulkanStatics::find_memory_type(m_physical_device, mem_req.memoryTypeBits,
+//             properties)
+//         )
+//     );
+//     m_device->bindBufferMemory(buffer, buffer_memory, 0);
+//
+//     return {buffer, buffer_memory};
+// }
 
-    auto buffer = m_device.createBuffer(
-        vk::BufferCreateInfo(vk::BufferCreateFlags(), size, usage, sharing_mode, used_families)
-    );
-
-    auto mem_req = m_device.getBufferMemoryRequirements(buffer);
-
-    auto buffer_memory = m_device.allocateMemory(
-        vk::MemoryAllocateInfo(mem_req.size, find_memory_type(mem_req.memoryTypeBits, properties))
-    );
-    m_device.bindBufferMemory(buffer, buffer_memory, 0);
-
-    return {buffer, buffer_memory};
-}
-
-void APIVulkan::copy_buffer(vk::Buffer src, vk::Buffer dst, size_t size)
-{
-    auto command_buffer =
-        create_command_buffer(m_example_command_pool, vk::CommandBufferLevel::ePrimary);
-
-    command_buffer.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit)
-    );
-    vk::BufferCopy region(0, 0, size);
-    command_buffer.copyBuffer(src, dst, region);
-    command_buffer.end();
-
-    vk::SubmitInfo submit_info{};
-    submit_info.setCommandBuffers(command_buffer);
-    m_graphics_queue.submit(submit_info);
-    m_graphics_queue.waitIdle();
-
-    m_device.freeCommandBuffers(m_example_command_pool, command_buffer);
-}
+// void APIVulkan::copy_buffer(vk::Buffer src, vk::Buffer dst, size_t size)
+// {
+//     auto command_buffer = VulkanStatics::create_command_buffer(
+//         *m_device, *m_example_command_pool, vk::CommandBufferLevel::ePrimary
+//     );
+//
+//     // auto command_buffer = VulkanCommandBuffer::create<1>(
+//     //     m_device, m_example_command_pool, vk::CommandBufferLevel::ePrimary
+//     // );
+//
+//     command_buffer.begin(vk::CommandBufferBeginInfo());
+//     const vk::BufferCopy region(0, 0, size);
+//     command_buffer.copyBuffer(src, dst, region);
+//     command_buffer.end();
+//
+//     m_graphics_queue.submit(vk::SubmitInfo(nullptr, nullptr, command_buffer, nullptr));
+//     // command_buffer.submit(m_graphics_queue);
+//     m_device->waitIdle();
+//     m_device->freeCommandBuffers(*m_example_command_pool, 1, &command_buffer);
+// }
 
 auto APIVulkan::create_descriptor_pool(vk::DescriptorType type, uint32_t size) -> vk::DescriptorPool
 {
     auto pool_size = vk::DescriptorPoolSize(type, size);
-    return m_device.createDescriptorPool(
+    return m_device->createDescriptorPool(
         vk::DescriptorPoolCreateInfo(vk::DescriptorPoolCreateFlags(), size, pool_size)
     );
 }
@@ -1657,7 +1695,7 @@ auto APIVulkan::create_descriptor_pool(vk::DescriptorType type, uint32_t size) -
 auto APIVulkan::create_descriptor_sets(uint32_t count) -> std::vector<vk::DescriptorSet>
 {
     std::vector<vk::DescriptorSetLayout> layouts(count, m_example_descriptor_set_layout);
-    return m_device.allocateDescriptorSets(
+    return m_device->allocateDescriptorSets(
         vk::DescriptorSetAllocateInfo(m_example_desc_pool, layouts)
     );
 }
@@ -1669,22 +1707,22 @@ auto APIVulkan::has_stencil_component(vk::Format format) -> bool
 
 void APIVulkan::cleanup_swapchain(VkSwapchainInfo& swapchain)
 {
-    m_device.destroyImageView(m_color_image_view);
-    m_device.destroyImageView(m_depth_image_view);
-    m_device.destroyImage(m_color_image);
-    m_device.destroyImage(m_depth_image);
-    m_device.freeMemory(m_color_image_memory);
-    m_device.freeMemory(m_depth_image_memory);
+    m_device->destroyImageView(m_color_image_view);
+    m_device->destroyImageView(m_depth_image_view);
+    m_device->destroyImage(m_color_image);
+    m_device->destroyImage(m_depth_image);
+    m_device->freeMemory(m_color_image_memory);
+    m_device->freeMemory(m_depth_image_memory);
 
     for (const auto& framebuffer : m_frame_buffers)
     {
-        m_device.destroyFramebuffer(framebuffer);
+        m_device->destroyFramebuffer(framebuffer);
     }
     for (const auto& image_view : m_swapchain_info.image_views)
     {
-        m_device.destroyImageView(image_view);
+        m_device->destroyImageView(image_view);
     }
-    m_device.destroySwapchainKHR(m_swapchain_info.swapchain);
+    m_device->destroySwapchainKHR(m_swapchain_info.swapchain);
 }
 
 auto APIVulkan::recreate_swapchain_and_framebuffers(
@@ -1702,7 +1740,7 @@ auto APIVulkan::recreate_swapchain_and_framebuffers(
         glfwGetFramebufferSize(m_window_ref.get_raw_window(), &width, &height);
         glfwWaitEvents();
     }
-    m_device.waitIdle();
+    m_device->waitIdle();
     cleanup_swapchain(m_swapchain_info);
     auto swapchain_info = create_swapchain(physical_device, surface, device, nullptr);
     create_color_resources(swapchain_info, m_color_image, m_color_image_view, m_color_image_memory);
