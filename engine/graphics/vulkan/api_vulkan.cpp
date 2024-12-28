@@ -211,11 +211,6 @@ APIVulkan::APIVulkan(Window& window, bool enable_validation_layers)
     m_example_command_buffers = VulkanStatics::create_command_buffers(
         *m_device, *m_example_command_pool, vk::CommandBufferLevel::ePrimary, MAX_FRAMES_IN_FLIGHT
     );
-    // m_example_command_buffers =
-    //     VulkanCommandBuffer::create<MAX_FRAMES_IN_FLIGHT>(
-    //         m_device, m_example_command_pool, vk::CommandBufferLevel::ePrimary
-    //     )
-    //         .value();
     create_sync_objects();
 }
 
@@ -1182,9 +1177,6 @@ void APIVulkan::create_example_vb()
         vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible
     );
 
-    // const auto data = m_device->mapMemory(buffer->memory(), 0, size);
-    // memcpy(data, m_model->m_vertices.data(), size);
-    // m_device->unmapMemory(buffer->memory());
     buffer->set_data<VertexData>(m_model->m_vertices);
 
     m_model_vb = buff_factory.create(
@@ -1338,11 +1330,6 @@ void APIVulkan::create_example_texture()
     uint32_t miplevels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
     m_example_mips = miplevels;
 
-    if (!pixels)
-    {
-        throw std::runtime_error("failed to load texture image!");
-    }
-
     const auto families = get_queue_families(*m_physical_device);
 
     auto factory = VulkanGpuBufferFactory(
@@ -1357,10 +1344,6 @@ void APIVulkan::create_example_texture()
         vk::SharingMode::eExclusive,
         vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible
     );
-    //
-    // auto data = m_device->mapMemory(buffer_mem, 0, buffer_size);
-    // memcpy(data, pixels, buffer_size);
-    // m_device->unmapMemory(buffer_mem);
 
     buffer->set_data<stbi_uc>(pixels_array);
 
@@ -1638,51 +1621,6 @@ void APIVulkan::create_sync_objects()
             m_device->createFence(vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
     }
 }
-// auto APIVulkan::create_buffer(
-//     uint32_t size,
-//     vk::BufferUsageFlags usage,
-//     vk::SharingMode sharing_mode,
-//     vk::MemoryPropertyFlags properties
-// ) -> std::tuple<vk::Buffer, vk::DeviceMemory>
-// {
-//     auto buffer = m_device->createBuffer(
-//         vk::BufferCreateInfo(vk::BufferCreateFlags(), size, usage, sharing_mode, used_families)
-//     );
-//
-//     auto mem_req = m_device->getBufferMemoryRequirements(buffer);
-//
-//     auto buffer_memory = m_device->allocateMemory(
-//         vk::MemoryAllocateInfo(
-//             mem_req.size,
-//             VulkanStatics::find_memory_type(m_physical_device, mem_req.memoryTypeBits,
-//             properties)
-//         )
-//     );
-//     m_device->bindBufferMemory(buffer, buffer_memory, 0);
-//
-//     return {buffer, buffer_memory};
-// }
-
-// void APIVulkan::copy_buffer(vk::Buffer src, vk::Buffer dst, size_t size)
-// {
-//     auto command_buffer = VulkanStatics::create_command_buffer(
-//         *m_device, *m_example_command_pool, vk::CommandBufferLevel::ePrimary
-//     );
-//
-//     // auto command_buffer = VulkanCommandBuffer::create<1>(
-//     //     m_device, m_example_command_pool, vk::CommandBufferLevel::ePrimary
-//     // );
-//
-//     command_buffer.begin(vk::CommandBufferBeginInfo());
-//     const vk::BufferCopy region(0, 0, size);
-//     command_buffer.copyBuffer(src, dst, region);
-//     command_buffer.end();
-//
-//     m_graphics_queue.submit(vk::SubmitInfo(nullptr, nullptr, command_buffer, nullptr));
-//     // command_buffer.submit(m_graphics_queue);
-//     m_device->waitIdle();
-//     m_device->freeCommandBuffers(*m_example_command_pool, 1, &command_buffer);
-// }
 
 auto APIVulkan::create_descriptor_pool(vk::DescriptorType type, uint32_t size) -> vk::DescriptorPool
 {

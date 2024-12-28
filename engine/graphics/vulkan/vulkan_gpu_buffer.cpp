@@ -27,16 +27,10 @@ auto VulkanGpuBufferFactory::create(
     );
     m_device->bindBufferMemory(buffer, buffer_memory, 0);
 
-    return std::make_shared<VulkanGpuBuffer>(
-        buffer,
-        buffer_memory,
-        m_command_pool,
-        m_device,
-        usage,
-        sharing_mode,
-        properties,
-        size
+    auto new_buffer = VulkanGpuBuffer(
+        buffer, buffer_memory, m_command_pool, m_device, usage, sharing_mode, properties, size
     );
+    return std::make_shared<VulkanGpuBuffer>(std::move(new_buffer));
 }
 
 auto VulkanGpuBuffer::copy_to(const VulkanGpuBuffer& other, const vk::Queue& queue) const -> bool
@@ -67,6 +61,11 @@ auto VulkanGpuBuffer::copy_to(const VulkanGpuBuffer& other, const vk::Queue& que
 }
 VulkanGpuBuffer::~VulkanGpuBuffer()
 {
+    if (!m_device)
+    {
+        return;
+    }
+
     m_device->freeMemory(m_memory);
     m_device->destroyBuffer(m_buffer);
 }

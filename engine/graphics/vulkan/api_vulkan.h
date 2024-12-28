@@ -77,8 +77,6 @@ private:
     uint32_t m_example_mips;
     // model related
     std::shared_ptr<Mesh> m_model;
-    // vk::Buffer m_model_vb;
-    // vk::Buffer m_model_ib;
     std::shared_ptr<VulkanGpuBuffer> m_model_vb;
     std::shared_ptr<VulkanGpuBuffer> m_model_ib;
 
@@ -200,15 +198,6 @@ private:
     void record_example_command_buffer(vk::CommandBuffer& buffer, uint32_t image_index);
 
     void create_sync_objects();
-
-    // auto create_buffer(
-    //     uint32_t size,
-    //     vk::BufferUsageFlags usage,
-    //     vk::SharingMode sharing_mode,
-    //     vk::MemoryPropertyFlags properties
-    // ) -> std::tuple<vk::Buffer, vk::DeviceMemory>;
-
-    // void copy_buffer(vk::Buffer src, vk::Buffer dst, size_t size);
 
     auto create_descriptor_pool(vk::DescriptorType type, uint32_t size) -> vk::DescriptorPool;
     auto create_descriptor_sets(uint32_t count) -> std::vector<vk::DescriptorSet>;
