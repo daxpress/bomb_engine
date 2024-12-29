@@ -4,12 +4,12 @@
 
 namespace BE_NAMESPACE
 {
-class VulkanGpuBuffer;
+class VulkanBuffer;
 
-class VulkanGpuBufferFactory
+class VulkanBufferFactory
 {
 public:
-    VulkanGpuBufferFactory(
+    VulkanBufferFactory(
         const std::vector<uint32_t>& families,
         std::shared_ptr<vk::PhysicalDevice> physical_device,
         std::shared_ptr<vk::Device> device,
@@ -21,7 +21,7 @@ public:
         const vk::BufferUsageFlags usage,
         const vk::SharingMode sharing_mode,
         const vk::MemoryPropertyFlags properties
-    ) -> std::shared_ptr<VulkanGpuBuffer>;
+    ) -> std::shared_ptr<VulkanBuffer>;
 
 private:
     const std::vector<uint32_t> m_families;
@@ -30,11 +30,11 @@ private:
     std::shared_ptr<vk::CommandPool> m_command_pool;
 };
 
-class VulkanGpuBuffer
+class VulkanBuffer
 {
-    friend class VulkanGpuBufferFactory;
+    friend class VulkanBufferFactory;
 
-    VulkanGpuBuffer(
+    VulkanBuffer(
         vk::Buffer buffer,
         vk::DeviceMemory memory,
         std::shared_ptr<vk::CommandPool> command_pool,
@@ -46,11 +46,11 @@ class VulkanGpuBuffer
     );
 
 public:
-    VulkanGpuBuffer(VulkanGpuBuffer&& other) noexcept;
+    VulkanBuffer(VulkanBuffer&& other) noexcept;
 
-    VulkanGpuBuffer& operator=(VulkanGpuBuffer&& other) noexcept;
+    VulkanBuffer& operator=(VulkanBuffer&& other) noexcept;
 
-    [[nodiscard]] auto copy_to(const VulkanGpuBuffer& other, const vk::Queue& queue) const -> bool;
+    [[nodiscard]] auto copy_to(const VulkanBuffer& other, const vk::Queue& queue) const -> bool;
 
     template <typename Type>
     auto set_data(const std::span<Type> data) -> void
@@ -64,7 +64,7 @@ public:
     [[nodiscard]] auto buffer() const -> const vk::Buffer& { return m_buffer; }
     [[nodiscard]] auto memory() const -> const vk::DeviceMemory& { return m_memory; }
 
-    ~VulkanGpuBuffer();
+    ~VulkanBuffer();
 
 private:
     uint32_t m_size = 0;

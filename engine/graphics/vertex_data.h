@@ -11,9 +11,6 @@ struct VertexData
     glm::vec3 color;
     glm::vec2 tex_coord;
 
-    static auto get_binding_description() -> vk::VertexInputBindingDescription;
-    static auto get_attribute_descriptions() -> std::vector<vk::VertexInputAttributeDescription>;
-
     inline auto operator==(const VertexData& other) const -> bool
     {
         return pos == other.pos && color == other.color && tex_coord == other.tex_coord;

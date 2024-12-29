@@ -50,7 +50,7 @@ auto VulkanImageFactory::create(
     const auto mem_req = m_device->getImageMemoryRequirements(image);
     const vk::MemoryAllocateInfo alloc_info(
         mem_req.size,
-        VulkanStatics::find_memory_type(*m_physical_device, mem_req.memoryTypeBits, properties)
+        vulkan_statics::memory::find_memory_type(*m_physical_device, mem_req.memoryTypeBits, properties)
     );
     auto memory = m_device->allocateMemory(alloc_info);
 
@@ -149,7 +149,7 @@ void VulkanImage::generate_mipmaps(const uint32_t mips) const
             LogSeverity::Fatal,
             "texture image format does not support linear binding!");
     }
-    const auto command_buffer = VulkanStatics::begin_one_time_commands(*m_device, *m_command_pool);
+    const auto command_buffer = vulkan_statics::command_buffer::begin_one_time_commands(*m_device, *m_command_pool);
 
     vk::ImageMemoryBarrier barrier{};
 
@@ -229,7 +229,7 @@ void VulkanImage::generate_mipmaps(const uint32_t mips) const
         nullptr,
         barrier
     );
-    VulkanStatics::end_one_time_commands(*m_device, command_buffer, *m_queue, *m_command_pool);
+    vulkan_statics::command_buffer::end_one_time_commands(*m_device, command_buffer, *m_queue, *m_command_pool);
 }
 
 void VulkanImage::make_image_view()
@@ -248,7 +248,7 @@ void VulkanImage::make_image_view()
 
 auto VulkanImage::transition_layout(const vk::ImageLayout new_layout) -> bool
 {
-    const auto buffer = VulkanStatics::begin_one_time_commands(*m_device, *m_command_pool);
+    const auto buffer = vulkan_statics::command_buffer::begin_one_time_commands(*m_device, *m_command_pool);
 
     vk::ImageMemoryBarrier barrier{};
 
@@ -260,7 +260,7 @@ auto VulkanImage::transition_layout(const vk::ImageLayout new_layout) -> bool
     if (new_layout == vk::ImageLayout::eDepthStencilAttachmentOptimal)
     {
         barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eDepth;
-        if (VulkanStatics::has_stencil_component(m_info.format))
+        if (vulkan_statics::image::has_stencil_component(m_info.format))
         {
             barrier.subresourceRange.aspectMask |= vk::ImageAspectFlagBits::eStencil;
         }
@@ -312,16 +312,16 @@ auto VulkanImage::transition_layout(const vk::ImageLayout new_layout) -> bool
 
     buffer.pipelineBarrier(src_stage, dst_stage, vk::DependencyFlags(), nullptr, nullptr, barrier);
 
-    VulkanStatics::end_one_time_commands(*m_device, buffer, *m_queue, *m_command_pool);
+    vulkan_statics::command_buffer::end_one_time_commands(*m_device, buffer, *m_queue, *m_command_pool);
 
     m_info.layout = new_layout;
 
     return true;
 }
 
-void VulkanImage::copy_from_buffer(const VulkanGpuBuffer& buffer)
+void VulkanImage::copy_from_buffer(const VulkanBuffer& buffer)
 {
-    const auto cmd_buffer = VulkanStatics::begin_one_time_commands(*m_device, *m_command_pool);
+    const auto cmd_buffer = vulkan_statics::command_buffer::begin_one_time_commands(*m_device, *m_command_pool);
 
     const vk::BufferImageCopy region(
         0,
@@ -335,7 +335,7 @@ void VulkanImage::copy_from_buffer(const VulkanGpuBuffer& buffer)
     cmd_buffer.copyBufferToImage(
         buffer.buffer(), m_image, vk::ImageLayout::eTransferDstOptimal, region
     );
-    VulkanStatics::end_one_time_commands(*m_device, cmd_buffer, *m_queue, *m_command_pool);
+    vulkan_statics::command_buffer::end_one_time_commands(*m_device, cmd_buffer, *m_queue, *m_command_pool);
 
     if (m_info.mips > 1)
     {

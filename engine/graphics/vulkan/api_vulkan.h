@@ -4,7 +4,7 @@
 #include "mesh.h"
 #include "spirv_shader.h"
 #include "vulkan/api_vulkan_structs.h"
-#include "vulkan_gpu_buffer.h"
+#include "vulkan_buffer.h"
 #include "vulkan_image.h"
 #include "window.h"
 
@@ -72,10 +72,10 @@ private:
     uint32_t m_example_mips;
     // model related
     std::shared_ptr<Mesh> m_model;
-    std::shared_ptr<VulkanGpuBuffer> m_model_vb;
-    std::shared_ptr<VulkanGpuBuffer> m_model_ib;
+    std::shared_ptr<VulkanBuffer> m_model_vb;
+    std::shared_ptr<VulkanBuffer> m_model_ib;
 
-    std::vector<std::shared_ptr<VulkanGpuBuffer>> m_uniform_buffers;
+    std::vector<std::shared_ptr<VulkanBuffer>> m_uniform_buffers;
     std::vector<std::any> m_uniform_buffers_mapped;
 
 private:

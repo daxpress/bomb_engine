@@ -175,7 +175,7 @@ APIVulkan::APIVulkan(Window& window, bool enable_validation_layers)
     // example pipeline related (we will create a sample scene rendered directly
     // from here to drive abstractions for scene and renderer's APIs)
     m_example_pipeline = create_example_pipeline();
-    m_example_command_pool = std::make_shared<vk::CommandPool>(VulkanStatics::create_command_pool(
+    m_example_command_pool = std::make_shared<vk::CommandPool>(vulkan_statics::create_command_pool(
         *m_device, vk::CommandPoolCreateFlagBits::eResetCommandBuffer, families.graphics.value()
     ));
     create_color_resources(m_swapchain_info);
@@ -189,7 +189,7 @@ APIVulkan::APIVulkan(Window& window, bool enable_validation_layers)
 
     create_example_texture();
 
-    m_example_sampler = VulkanStatics::create_image_sampler(
+    m_example_sampler = vulkan_statics::image::create_image_sampler(
         *m_physical_device, *m_device, vk::Filter::eLinear, vk::SamplerAddressMode::eRepeat
     );
 
@@ -199,7 +199,7 @@ APIVulkan::APIVulkan(Window& window, bool enable_validation_layers)
     m_example_desc_sets = create_descriptor_sets(MAX_FRAMES_IN_FLIGHT);
     populate_example_desc_sets();
 
-    m_example_command_buffers = VulkanStatics::create_command_buffers(
+    m_example_command_buffers = vulkan_statics::command_buffer::create_command_buffers(
         *m_device, *m_example_command_pool, vk::CommandBufferLevel::ePrimary, MAX_FRAMES_IN_FLIGHT
     );
     create_sync_objects();
@@ -707,8 +707,8 @@ auto APIVulkan::create_example_pipeline() -> vk::Pipeline
     depth_stencil.depthBoundsTestEnable = false;
     depth_stencil.stencilTestEnable = false;
 
-    auto binding_desc = VertexData::get_binding_description();
-    auto attrib_desc = VertexData::get_attribute_descriptions();
+    auto binding_desc = vulkan_statics::mesh::get_binding_description();
+    auto attrib_desc = vulkan_statics::mesh::get_attribute_descriptions();
     vk::PipelineVertexInputStateCreateInfo vert_input(
         vk::PipelineVertexInputStateCreateFlagBits(), binding_desc, attrib_desc
     );
@@ -889,7 +889,7 @@ void APIVulkan::create_example_vb()
 
     const auto families = get_queue_families(*m_physical_device);
 
-    VulkanGpuBufferFactory buff_factory(
+    VulkanBufferFactory buff_factory(
         {families.graphics.value(), families.transfer.value(), families.compute.value()},
         m_physical_device,
         m_device,
@@ -924,7 +924,7 @@ void APIVulkan::create_example_ib()
 
     const auto families = get_queue_families(*m_physical_device);
 
-    VulkanGpuBufferFactory buff_factory(
+    VulkanBufferFactory buff_factory(
         {families.graphics.value(), families.transfer.value(), families.compute.value()},
         m_physical_device,
         m_device,
@@ -958,7 +958,7 @@ void APIVulkan::create_example_uniform_buffers()
     const size_t size = sizeof(UniformBufferObject);
 
     const auto families = get_queue_families(*m_physical_device);
-    VulkanGpuBufferFactory buff_factory(
+    VulkanBufferFactory buff_factory(
         {families.graphics.value(), families.transfer.value(), families.compute.value()},
         m_physical_device,
         m_device,
@@ -1058,7 +1058,7 @@ void APIVulkan::create_example_texture()
 
     const auto families = get_queue_families(*m_physical_device);
 
-    auto factory = VulkanGpuBufferFactory(
+    auto factory = VulkanBufferFactory(
         {families.graphics.value(), families.transfer.value(), families.compute.value()},
         m_physical_device,
         m_device,

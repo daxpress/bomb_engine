@@ -1,4 +1,4 @@
-#include "vulkan_gpu_buffer.h"
+#include "vulkan_buffer.h"
 
 #include "api_vulkan_internal.h"
 #include "vulkan_statics.h"
@@ -6,7 +6,7 @@
 namespace BE_NAMESPACE
 {
 
-VulkanGpuBufferFactory::VulkanGpuBufferFactory(
+VulkanBufferFactory::VulkanBufferFactory(
     const std::vector<uint32_t>& families,
     std::shared_ptr<vk::PhysicalDevice> physical_device,
     std::shared_ptr<vk::Device> device,
@@ -19,12 +19,12 @@ VulkanGpuBufferFactory::VulkanGpuBufferFactory(
 {
 }
 
-auto VulkanGpuBufferFactory::create(
+auto VulkanBufferFactory::create(
     const uint32_t size,
     const vk::BufferUsageFlags usage,
     const vk::SharingMode sharing_mode,
     const vk::MemoryPropertyFlags properties
-) -> std::shared_ptr<VulkanGpuBuffer>
+) -> std::shared_ptr<VulkanBuffer>
 {
     auto buffer = m_device->createBuffer(
         vk::BufferCreateInfo(vk::BufferCreateFlags(), size, usage, sharing_mode, m_families)
@@ -35,18 +35,18 @@ auto VulkanGpuBufferFactory::create(
     auto buffer_memory = m_device->allocateMemory(
         vk::MemoryAllocateInfo(
             mem_req.size,
-            VulkanStatics::find_memory_type(*m_physical_device, mem_req.memoryTypeBits, properties)
+            vulkan_statics::memory::find_memory_type(*m_physical_device, mem_req.memoryTypeBits, properties)
         )
     );
     m_device->bindBufferMemory(buffer, buffer_memory, 0);
 
-    auto new_buffer = VulkanGpuBuffer(
+    auto new_buffer = VulkanBuffer(
         buffer, buffer_memory, m_command_pool, m_device, usage, sharing_mode, properties, size
     );
-    return std::make_shared<VulkanGpuBuffer>(std::move(new_buffer));
+    return std::make_shared<VulkanBuffer>(std::move(new_buffer));
 }
 
-VulkanGpuBuffer::VulkanGpuBuffer(
+VulkanBuffer::VulkanBuffer(
     vk::Buffer buffer,
     vk::DeviceMemory memory,
     std::shared_ptr<vk::CommandPool> command_pool,
@@ -67,7 +67,7 @@ VulkanGpuBuffer::VulkanGpuBuffer(
 {
 }
 
-VulkanGpuBuffer::VulkanGpuBuffer(VulkanGpuBuffer&& other) noexcept
+VulkanBuffer::VulkanBuffer(VulkanBuffer&& other) noexcept
     : m_size(other.m_size),
       m_usage(other.m_usage),
       m_sharing_mode(other.m_sharing_mode),
@@ -81,7 +81,7 @@ VulkanGpuBuffer::VulkanGpuBuffer(VulkanGpuBuffer&& other) noexcept
     other.m_device = nullptr;
 }
 
-VulkanGpuBuffer& VulkanGpuBuffer::operator=(VulkanGpuBuffer&& other) noexcept
+VulkanBuffer& VulkanBuffer::operator=(VulkanBuffer&& other) noexcept
 {
     if (this != &other)
     {
@@ -105,14 +105,14 @@ VulkanGpuBuffer& VulkanGpuBuffer::operator=(VulkanGpuBuffer&& other) noexcept
     return *this;
 }
 
-auto VulkanGpuBuffer::copy_to(const VulkanGpuBuffer& other, const vk::Queue& queue) const -> bool
+auto VulkanBuffer::copy_to(const VulkanBuffer& other, const vk::Queue& queue) const -> bool
 {
     if (other.m_size < m_size)
     {
         return false;
     }
 
-    auto command_buffer = VulkanStatics::create_command_buffer(
+    auto command_buffer = vulkan_statics::command_buffer::create_command_buffer(
         *m_device, *m_command_pool, vk::CommandBufferLevel::ePrimary
     );
 
@@ -131,7 +131,7 @@ auto VulkanGpuBuffer::copy_to(const VulkanGpuBuffer& other, const vk::Queue& que
     m_device->freeCommandBuffers(*m_command_pool, command_buffer);
     return true;
 }
-VulkanGpuBuffer::~VulkanGpuBuffer()
+VulkanBuffer::~VulkanBuffer()
 {
     if (!m_device)
     {

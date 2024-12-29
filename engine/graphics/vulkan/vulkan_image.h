@@ -1,6 +1,6 @@
 #pragma once
 #include "api_vulkan_structs.h"
-#include "vulkan_gpu_buffer.h"
+#include "vulkan_buffer.h"
 
 namespace BE_NAMESPACE
 {
@@ -65,7 +65,7 @@ public:
     ~VulkanImage();
 
     auto transition_layout(const vk::ImageLayout new_layout) -> bool;
-    void copy_from_buffer(const VulkanGpuBuffer& buffer);
+    void copy_from_buffer(const VulkanBuffer& buffer);
 
     [[nodiscard]] auto info() const -> VulkanImageInfo { return m_info; }
     [[nodiscard]] auto image() const -> vk::Image { return m_image; }
