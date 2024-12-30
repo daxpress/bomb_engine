@@ -45,6 +45,9 @@ function(new_engine_module module_name library_type)
 
     setup_static_analysis(${module_name})
 
+    # needed almost everywhere...
+    find_package(EnTT REQUIRED)
+    target_link_libraries(${module_name} EnTT::EnTT)
     # builds a precompiled header for each module so that we can have common stl stuff in the engine one
     # and another one in the module that contains external libraries for the module
     get_target_property(common_pch bomb_engine_engine SOURCE_DIR)

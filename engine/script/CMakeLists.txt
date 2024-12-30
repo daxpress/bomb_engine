@@ -7,6 +7,3 @@ PRIVATE
 FILE_SET HEADERS FILES
 	"scriptable.h" "native_script.h"
 )
-
-find_package(EnTT REQUIRED)
-target_link_libraries(bomb_engine_script EnTT::EnTT)

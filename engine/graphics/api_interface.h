@@ -11,6 +11,6 @@ public:
 
     inline virtual auto get_api() -> E_API = 0;
 
-    virtual void draw_frame() {};
+    virtual void draw_frame() = 0;
 };
 }  // namespace BE_NAMESPACE
