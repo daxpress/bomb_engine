@@ -1,12 +1,12 @@
 #include "vulkan_statics.h"
 
 #include "api_vulkan_internal.h"
+#include "api_vulkan_structs.h"
 #include "vertex_data.h"
 
 namespace BE_NAMESPACE
 {
-
-auto vulkan_statics::memory::find_memory_type(
+auto vulkan_statics::find_memory_type(
     const vk::PhysicalDevice& physical_device,
     const uint32_t type_bits,
     const vk::MemoryPropertyFlags props
@@ -64,6 +64,55 @@ void vulkan_statics::command_buffer::end_one_time_commands(
 
     device.freeCommandBuffers(pool, buffer);
 }
+auto vulkan_statics::get_queue_families(
+    const vk::PhysicalDevice& physical_device, const vk::SurfaceKHR& surface
+) -> VkQueueFamilyIndices
+{
+    static VkQueueFamilyIndices families{};
+
+    if (families.is_complete())
+    {
+        // caching families as they will effectively not change
+        return families;
+    }
+
+    auto const queue_families = physical_device.getQueueFamilyProperties();
+
+    for (uint32_t family_index = 0; const auto& queue_family : queue_families)
+    {
+        if (queue_family.queueFlags & vk::QueueFlagBits::eGraphics)
+        {
+            families.graphics = family_index;
+        }
+
+        if (physical_device.getSurfaceSupportKHR(family_index, surface))
+        {
+            families.present = family_index;
+        }
+
+        if (!(queue_family.queueFlags & vk::QueueFlagBits::eGraphics) &&
+            queue_family.queueFlags & vk::QueueFlagBits::eTransfer)
+        {
+            families.transfer = family_index;
+        }
+
+        if (!(queue_family.queueFlags & vk::QueueFlagBits::eGraphics) &&
+            queue_family.queueFlags & vk::QueueFlagBits::eCompute)
+        {
+            families.compute = family_index;
+        }
+
+        if (families.is_complete())
+        {
+            break;
+        }
+
+        family_index++;
+    }
+
+    return families;
+}
+
 auto vulkan_statics::create_command_pool(
     const vk::Device& device, const vk::CommandPoolCreateFlags flags, const uint32_t queue_family
 ) -> vk::CommandPool

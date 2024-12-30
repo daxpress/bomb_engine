@@ -50,7 +50,7 @@ auto VulkanImageFactory::create(
     const auto mem_req = m_device->getImageMemoryRequirements(image);
     const vk::MemoryAllocateInfo alloc_info(
         mem_req.size,
-        vulkan_statics::memory::find_memory_type(*m_physical_device, mem_req.memoryTypeBits, properties)
+        vulkan_statics::find_memory_type(*m_physical_device, mem_req.memoryTypeBits, properties)
     );
     auto memory = m_device->allocateMemory(alloc_info);
 

@@ -4,6 +4,7 @@
 #include "mesh.h"
 #include "spirv_shader.h"
 #include "vulkan/api_vulkan_structs.h"
+#include "vulkan/vulkan_swapchain.h"
 #include "vulkan_buffer.h"
 #include "vulkan_image.h"
 #include "window.h"
@@ -44,7 +45,7 @@ private:
     std::shared_ptr<vk::Queue> m_present_queue;
     std::shared_ptr<vk::Queue> m_transfer_queue;
     std::shared_ptr<vk::Queue> m_compute_queue;
-    VkSwapchainInfo m_swapchain_info;
+    std::shared_ptr<VulkanSwapchain> m_swapchain_info;
     std::vector<vk::Framebuffer> m_frame_buffers;
     uint32_t m_current_frame = 0;
     vk::SampleCountFlagBits m_msaa_samples = vk::SampleCountFlagBits::e1;
@@ -97,37 +98,12 @@ private:
     /// <returns> the overall score based on the features and properties</returns>
     auto rate_physical_device(vk::PhysicalDevice physical_device) -> uint32_t;
     auto physical_device_is_suitable(vk::PhysicalDevice physical_device) -> bool;
-    auto get_queue_families(const vk::PhysicalDevice& physical_device) const
-        -> VkQueueFamilyIndices;
     auto check_extensions_support(vk::PhysicalDevice physical_device) -> bool;
     auto get_sample_count() -> vk::SampleCountFlagBits;
 
     auto create_logical_device(vk::PhysicalDevice physical_device) -> vk::Device;
 
-    auto create_swapchain(
-        vk::PhysicalDevice physical_device,
-        vk::SurfaceKHR surface,
-        vk::Device device,
-        vk::SwapchainKHR old_swapchain = nullptr
-    ) -> VkSwapchainInfo;
-
-    void cleanup_swapchain(VkSwapchainInfo& swapchain);
-
-    auto recreate_swapchain_and_framebuffers(
-        vk::PhysicalDevice physical_device,
-        vk::SurfaceKHR surface,
-        vk::Device device,
-        vk::SwapchainKHR old_swapchain,
-        vk::RenderPass render_pass
-    ) -> std::tuple<VkSwapchainInfo, std::vector<vk::Framebuffer>>;
-
-    auto choose_swapchain_surface_format(std::vector<vk::SurfaceFormatKHR> formats)
-        -> vk::SurfaceFormatKHR;
-
-    auto choose_swapchain_present_mode(const std::vector<vk::PresentModeKHR>& present_modes)
-        -> vk::PresentModeKHR;
-
-    auto choose_swapchain_extent(vk::SurfaceCapabilitiesKHR capabilities) -> vk::Extent2D;
+    auto recreate_swapchain_and_framebuffers(vk::RenderPass render_pass) -> void;
 
     auto create_shader_module(SPIRVShader& shader) -> vk::ShaderModule;
 
@@ -144,9 +120,10 @@ private:
     void create_example_texture();
     void draw_example_frame();
 
-    void create_color_resources(const VkSwapchainInfo& swapchain);
-    void create_depth_resources(const VkSwapchainInfo& swapchain);
-    auto create_frame_buffers(VkSwapchainInfo swapchain, vk::RenderPass render_pass)
+    void create_color_resources(const VulkanSwapchain& swapchain);
+    void create_depth_resources(const VulkanSwapchain& swapchain);
+
+    auto create_frame_buffers(const VulkanSwapchain& swapchain, vk::RenderPass render_pass)
         -> std::vector<vk::Framebuffer>;
 
     void record_example_command_buffer(vk::CommandBuffer& buffer, uint32_t image_index);

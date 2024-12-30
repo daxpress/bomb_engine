@@ -1,6 +1,5 @@
 #include "vulkan_buffer.h"
 
-#include "api_vulkan_internal.h"
 #include "vulkan_statics.h"
 
 namespace BE_NAMESPACE
@@ -35,7 +34,7 @@ auto VulkanBufferFactory::create(
     auto buffer_memory = m_device->allocateMemory(
         vk::MemoryAllocateInfo(
             mem_req.size,
-            vulkan_statics::memory::find_memory_type(*m_physical_device, mem_req.memoryTypeBits, properties)
+            vulkan_statics::find_memory_type(*m_physical_device, mem_req.memoryTypeBits, properties)
         )
     );
     m_device->bindBufferMemory(buffer, buffer_memory, 0);

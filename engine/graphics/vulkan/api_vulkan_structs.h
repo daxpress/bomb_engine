@@ -28,15 +28,6 @@ struct VkSwapchainDetails
     VkSwapchainDetails(vk::PhysicalDevice physical_device, vk::SurfaceKHR surface);
 };
 
-struct VkSwapchainInfo
-{
-    vk::SwapchainKHR swapchain;
-    std::vector<vk::Image> images;
-    std::vector<vk::ImageView> image_views;
-    vk::Format format;
-    vk::Extent2D extent;
-};
-
 struct UniformBufferObject
 {
     alignas(16) glm::mat4 model;

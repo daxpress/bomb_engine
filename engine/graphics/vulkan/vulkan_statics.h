@@ -2,18 +2,18 @@
 
 namespace BE_NAMESPACE
 {
+struct VkQueueFamilyIndices;
+
 namespace vulkan_statics
 {
+auto get_queue_families(const vk::PhysicalDevice& physical_device, const vk::SurfaceKHR& surface)
+    -> VkQueueFamilyIndices;
 
-namespace memory
-{
 auto find_memory_type(
     const vk::PhysicalDevice& physical_device,
     const uint32_t type_bits,
     const vk::MemoryPropertyFlags props
 ) -> uint32_t;
-
-}
 
 namespace command_buffer
 {

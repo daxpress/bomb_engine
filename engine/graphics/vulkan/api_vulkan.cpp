@@ -162,7 +162,7 @@ APIVulkan::APIVulkan(Window& window, bool enable_validation_layers)
 
     m_device = std::make_shared<vk::Device>(create_logical_device(*m_physical_device));
 
-    auto families = get_queue_families(*m_physical_device);
+    auto families = vulkan_statics::get_queue_families(*m_physical_device, m_surface);
     m_graphics_queue =
         std::make_shared<vk::Queue>(m_device->getQueue(families.graphics.value(), 0));
     m_present_queue = std::make_shared<vk::Queue>(m_device->getQueue(families.present.value(), 0));
@@ -170,7 +170,9 @@ APIVulkan::APIVulkan(Window& window, bool enable_validation_layers)
         std::make_shared<vk::Queue>(m_device->getQueue(families.transfer.value(), 0));
     m_compute_queue = std::make_shared<vk::Queue>(m_device->getQueue(families.compute.value(), 0));
 
-    m_swapchain_info = create_swapchain(*m_physical_device, m_surface, *m_device);
+    // m_swapchain_info = create_swapchain(*m_physical_device, m_surface, *m_device);
+    m_swapchain_info =
+        VulkanSwapchain::create(m_physical_device, m_device, m_window_ref, m_surface);
 
     // example pipeline related (we will create a sample scene rendered directly
     // from here to drive abstractions for scene and renderer's APIs)
@@ -178,9 +180,9 @@ APIVulkan::APIVulkan(Window& window, bool enable_validation_layers)
     m_example_command_pool = std::make_shared<vk::CommandPool>(vulkan_statics::create_command_pool(
         *m_device, vk::CommandPoolCreateFlagBits::eResetCommandBuffer, families.graphics.value()
     ));
-    create_color_resources(m_swapchain_info);
-    create_depth_resources(m_swapchain_info);
-    m_frame_buffers = create_frame_buffers(m_swapchain_info, m_example_renderpass);
+    create_color_resources(*m_swapchain_info);
+    create_depth_resources(*m_swapchain_info);
+    m_frame_buffers = create_frame_buffers(*m_swapchain_info, m_example_renderpass);
 
     m_model = std::make_shared<Mesh>("assets/models/viking_room.obj");
 
@@ -232,7 +234,14 @@ APIVulkan::~APIVulkan()
 
     m_device->destroyCommandPool(*m_example_command_pool);
 
-    cleanup_swapchain(m_swapchain_info);
+    m_color_image.reset();
+    m_depth_image.reset();
+    // cleanup_swapchain(m_swapchain_info);
+    for (const auto& framebuffer : m_frame_buffers)
+    {
+        m_device->destroyFramebuffer(framebuffer);
+    }
+    m_swapchain_info.reset();
 
     m_device->destroyPipeline(m_example_pipeline);
     m_device->destroyRenderPass(m_example_renderpass);
@@ -359,7 +368,7 @@ auto APIVulkan::select_physical_device() -> vk::PhysicalDevice
 
 auto APIVulkan::physical_device_is_suitable(vk::PhysicalDevice physical_device) -> bool
 {
-    auto families = get_queue_families(physical_device);
+    auto families = vulkan_statics::get_queue_families(physical_device, m_surface);
     if (!families.is_complete())
     {
         return false;
@@ -408,54 +417,6 @@ auto APIVulkan::rate_physical_device(vk::PhysicalDevice physical_device) -> uint
     return score;
 }
 
-auto APIVulkan::get_queue_families(const vk::PhysicalDevice& physical_device) const
-    -> VkQueueFamilyIndices
-{
-    static VkQueueFamilyIndices families{};
-
-    if (families.is_complete())
-    {
-        // caching families as they will effectively not change
-        return families;
-    }
-
-    auto const queue_families = physical_device.getQueueFamilyProperties();
-
-    for (uint32_t family_index = 0; const auto& queue_family : queue_families)
-    {
-        if (queue_family.queueFlags & vk::QueueFlagBits::eGraphics)
-        {
-            families.graphics = family_index;
-        }
-
-        if (physical_device.getSurfaceSupportKHR(family_index, m_surface))
-        {
-            families.present = family_index;
-        }
-
-        if (!(queue_family.queueFlags & vk::QueueFlagBits::eGraphics) &&
-            queue_family.queueFlags & vk::QueueFlagBits::eTransfer)
-        {
-            families.transfer = family_index;
-        }
-
-        if (!(queue_family.queueFlags & vk::QueueFlagBits::eGraphics) &&
-            queue_family.queueFlags & vk::QueueFlagBits::eCompute)
-        {
-            families.compute = family_index;
-        }
-
-        if (families.is_complete())
-        {
-            break;
-        }
-
-        family_index++;
-    }
-
-    return families;
-}
-
 auto APIVulkan::check_extensions_support(vk::PhysicalDevice physical_device) -> bool
 {
     auto available_extensions = physical_device.enumerateDeviceExtensionProperties();
@@ -491,7 +452,7 @@ auto APIVulkan::get_sample_count() -> vk::SampleCountFlagBits
 
 auto APIVulkan::create_logical_device(vk::PhysicalDevice physical_device) -> vk::Device
 {
-    auto families = get_queue_families(physical_device);
+    auto families = vulkan_statics::get_queue_families(physical_device, m_surface);
 
     std::set<uint32_t> unique_families = {
         families.graphics.value(),
@@ -534,125 +495,6 @@ auto APIVulkan::create_logical_device(vk::PhysicalDevice physical_device) -> vk:
     }
 
     return physical_device.createDevice(create_info);
-}
-
-auto APIVulkan::create_swapchain(
-    vk::PhysicalDevice physical_device,
-    vk::SurfaceKHR surface,
-    vk::Device device,
-    vk::SwapchainKHR old_swapchain
-) -> VkSwapchainInfo
-{
-    auto swapchain_details = VkSwapchainDetails(physical_device, surface);
-    auto [format, color_space] = choose_swapchain_surface_format(swapchain_details.formats);
-    auto present_mode = choose_swapchain_present_mode(swapchain_details.present_modes);
-    auto extent = choose_swapchain_extent(swapchain_details.capabilities);
-
-    uint32_t image_count = swapchain_details.capabilities.minImageCount + 1;
-    if (swapchain_details.capabilities.maxImageCount > 0 &&
-        image_count > swapchain_details.capabilities.maxImageCount)
-    {
-        image_count = swapchain_details.capabilities.maxImageCount;
-    }
-
-    auto indices = get_queue_families(physical_device);
-    std::vector<uint32_t> swapchain_sharing_indicies{};
-    uint32_t sharing_index_count = 0;
-    auto sharing_mode = vk::SharingMode::eExclusive;
-    if (indices.graphics != indices.present)
-    {
-        sharing_index_count = 2;
-        swapchain_sharing_indicies = {indices.graphics.value(), indices.present.value()};
-        sharing_mode = vk::SharingMode::eConcurrent;
-    }
-
-    vk::SwapchainCreateInfoKHR create_info(
-        vk::SwapchainCreateFlagsKHR(),
-        surface,
-        image_count,
-        format,
-        color_space,
-        extent,
-        1,
-        vk::ImageUsageFlagBits::eColorAttachment,
-        sharing_mode,
-        sharing_index_count,
-        swapchain_sharing_indicies.data(),
-        swapchain_details.capabilities.currentTransform,
-        vk::CompositeAlphaFlagBitsKHR::eOpaque,
-        present_mode,
-        true,
-        old_swapchain,
-        nullptr
-    );
-
-    VkSwapchainInfo swapchain_info{};
-    swapchain_info.swapchain = device.createSwapchainKHR(create_info);
-    swapchain_info.extent = extent;
-    swapchain_info.format = format;
-    swapchain_info.images = device.getSwapchainImagesKHR(swapchain_info.swapchain);
-
-    swapchain_info.image_views.reserve(swapchain_info.images.size());
-    vk::ImageViewCreateInfo image_view_create_info(
-        vk::ImageViewCreateFlags(),
-        {},
-        vk::ImageViewType::e2D,
-        format,
-        {},
-        vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}
-    );
-
-    for (const auto& image : swapchain_info.images)
-    {
-        image_view_create_info.image = image;
-        swapchain_info.image_views.push_back(device.createImageView(image_view_create_info));
-    }
-
-    return swapchain_info;
-}
-
-auto APIVulkan::choose_swapchain_surface_format(std::vector<vk::SurfaceFormatKHR> formats)
-    -> vk::SurfaceFormatKHR
-{
-    for (const auto& format : formats)
-    {
-        if (format.format == vk::Format::eB8G8R8A8Srgb &&
-            format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear)
-        {
-            return format;
-        }
-    }
-    return formats[0];
-}
-
-auto APIVulkan::choose_swapchain_present_mode(const std::vector<vk::PresentModeKHR>& present_modes)
-    -> vk::PresentModeKHR
-{
-    for (const auto& present_mode : present_modes)
-    {
-        if (present_mode == vk::PresentModeKHR::eMailbox)  // to render frames as fast as
-                                                           // possible
-        {
-            return present_mode;
-        }
-    }
-    // guaranteed by spec
-    return vk::PresentModeKHR::eFifo;
-}
-
-auto APIVulkan::choose_swapchain_extent(vk::SurfaceCapabilitiesKHR capabilities) -> vk::Extent2D
-{
-    if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
-    {
-        return capabilities.currentExtent;
-    }
-
-    int width, height;
-    glfwGetFramebufferSize(m_window_ref.get_raw_window(), &width, &height);
-
-    vk::Extent2D extent(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
-
-    return std::clamp(extent, capabilities.minImageExtent, capabilities.maxImageExtent);
 }
 
 auto APIVulkan::create_shader_module(SPIRVShader& shader) -> vk::ShaderModule
@@ -721,9 +563,9 @@ auto APIVulkan::create_example_pipeline() -> vk::Pipeline
     );
 
     vk::Viewport viewport(
-        0, 0, m_swapchain_info.extent.width, m_swapchain_info.extent.height, 0, 1
+        0, 0, m_swapchain_info->m_extent.width, m_swapchain_info->m_extent.height, 0, 1
     );
-    vk::Rect2D scissor({0, 0}, m_swapchain_info.extent);
+    vk::Rect2D scissor({0, 0}, m_swapchain_info->m_extent);
     vk::PipelineViewportStateCreateInfo viewport_state(
         vk::PipelineViewportStateCreateFlagBits(), viewport, scissor
     );
@@ -795,7 +637,7 @@ auto APIVulkan::create_example_render_pass() -> vk::RenderPass
 {
     vk::AttachmentDescription color_attachment(
         vk::AttachmentDescriptionFlagBits(),
-        m_swapchain_info.format,
+        m_swapchain_info->m_format,
         m_msaa_samples,
         vk::AttachmentLoadOp::eClear,
         vk::AttachmentStoreOp::eStore,
@@ -819,7 +661,7 @@ auto APIVulkan::create_example_render_pass() -> vk::RenderPass
 
     vk::AttachmentDescription color_attachment_resolve(
         vk::AttachmentDescriptionFlagBits(),
-        m_swapchain_info.format,
+        m_swapchain_info->m_format,
         vk::SampleCountFlagBits::e1,
         vk::AttachmentLoadOp::eDontCare,
         vk::AttachmentStoreOp::eStore,
@@ -887,7 +729,7 @@ void APIVulkan::create_example_vb()
 {
     const auto size = m_model->m_vertices.size() * sizeof(VertexData);
 
-    const auto families = get_queue_families(*m_physical_device);
+    const auto families = vulkan_statics::get_queue_families(*m_physical_device, m_surface);
 
     VulkanBufferFactory buff_factory(
         {families.graphics.value(), families.transfer.value(), families.compute.value()},
@@ -922,7 +764,7 @@ void APIVulkan::create_example_ib()
 {
     const auto size = m_model->m_indices.size() * sizeof(uint32_t);
 
-    const auto families = get_queue_families(*m_physical_device);
+    const auto families = vulkan_statics::get_queue_families(*m_physical_device, m_surface);
 
     VulkanBufferFactory buff_factory(
         {families.graphics.value(), families.transfer.value(), families.compute.value()},
@@ -957,7 +799,7 @@ void APIVulkan::create_example_uniform_buffers()
 {
     const size_t size = sizeof(UniformBufferObject);
 
-    const auto families = get_queue_families(*m_physical_device);
+    const auto families = vulkan_statics::get_queue_families(*m_physical_device, m_surface);
     VulkanBufferFactory buff_factory(
         {families.graphics.value(), families.transfer.value(), families.compute.value()},
         m_physical_device,
@@ -996,8 +838,8 @@ void APIVulkan::update_uniform_buffer(uint32_t image_index)
     ubo.view = glm::lookAt(glm::vec3(2.0f), glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     ubo.projection = glm::perspective(
         glm::radians(45.0f),
-        static_cast<float>(m_swapchain_info.extent.width) /
-            static_cast<float>(m_swapchain_info.extent.height),
+        static_cast<float>(m_swapchain_info->m_extent.width) /
+            static_cast<float>(m_swapchain_info->m_extent.height),
         0.1f,
         10.0f
     );
@@ -1056,7 +898,7 @@ void APIVulkan::create_example_texture()
     uint32_t miplevels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
     m_example_mips = miplevels;
 
-    const auto families = get_queue_families(*m_physical_device);
+    const auto families = vulkan_statics::get_queue_families(*m_physical_device, m_surface);
 
     auto factory = VulkanBufferFactory(
         {families.graphics.value(), families.transfer.value(), families.compute.value()},
@@ -1105,7 +947,7 @@ void APIVulkan::draw_example_frame()
     );
 
     auto [image_index_result, image_index] = m_device->acquireNextImageKHR(
-        m_swapchain_info.swapchain,
+        m_swapchain_info->m_swapchain,
         std::numeric_limits<uint64_t>().max(),
         m_swapchain_image_available[m_current_frame],
         nullptr
@@ -1113,9 +955,7 @@ void APIVulkan::draw_example_frame()
 
     if (image_index_result == vk::Result::eErrorOutOfDateKHR)
     {
-        std::tie(m_swapchain_info, m_frame_buffers) = recreate_swapchain_and_framebuffers(
-            *m_physical_device, m_surface, *m_device, nullptr, m_example_renderpass
-        );
+        recreate_swapchain_and_framebuffers(m_example_renderpass);
         return;
     }
     else if (image_index_result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR)
@@ -1149,42 +989,38 @@ void APIVulkan::draw_example_frame()
     {
         auto present_result = m_present_queue->presentKHR(
             vk::PresentInfoKHR(
-                m_render_finished[m_current_frame], m_swapchain_info.swapchain, image_index
+                m_render_finished[m_current_frame], m_swapchain_info->m_swapchain, image_index
             )
         );
         if (present_result == vk::Result::eSuboptimalKHR || m_frame_resized)
         {
             m_frame_resized = false;
-            std::tie(m_swapchain_info, m_frame_buffers) = recreate_swapchain_and_framebuffers(
-                *m_physical_device, m_surface, *m_device, nullptr, m_example_renderpass
-            );
+            recreate_swapchain_and_framebuffers(m_example_renderpass);
         }
     }
     catch (const vk::OutOfDateKHRError)
     {
         m_frame_resized = false;
-        std::tie(m_swapchain_info, m_frame_buffers) = recreate_swapchain_and_framebuffers(
-            *m_physical_device, m_surface, *m_device, nullptr, m_example_renderpass
-        );
+        recreate_swapchain_and_framebuffers(m_example_renderpass);
     }
 
     m_current_frame = (m_current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
-void APIVulkan::create_color_resources(const VkSwapchainInfo& swapchain)
+void APIVulkan::create_color_resources(const VulkanSwapchain& swapchain)
 {
-    const auto families = get_queue_families(*m_physical_device);
+    const auto families = vulkan_statics::get_queue_families(*m_physical_device, m_surface);
     const auto img_factory = VulkanImageFactory(
         families, m_physical_device, m_device, m_example_command_pool, m_graphics_queue
     );
 
     m_color_image = img_factory.create(
         VulkanImageInfo{
-            .width = swapchain.extent.width,
-            .height = swapchain.extent.height,
+            .width = swapchain.m_extent.width,
+            .height = swapchain.m_extent.height,
             .mips = 1,
             .num_samples = m_msaa_samples,
-            .format = swapchain.format,
+            .format = swapchain.m_format,
             .tiling = vk::ImageTiling::eOptimal,
             .usage = vk::ImageUsageFlagBits::eColorAttachment |
                      vk::ImageUsageFlagBits::eTransientAttachment,
@@ -1195,10 +1031,10 @@ void APIVulkan::create_color_resources(const VkSwapchainInfo& swapchain)
     );
 }
 
-void APIVulkan::create_depth_resources(const VkSwapchainInfo& swapchain)
+void APIVulkan::create_depth_resources(const VulkanSwapchain& swapchain)
 {
     const auto img_factory = VulkanImageFactory(
-        get_queue_families(*m_physical_device),
+        vulkan_statics::get_queue_families(*m_physical_device, m_surface),
         m_physical_device,
         m_device,
         m_example_command_pool,
@@ -1207,8 +1043,8 @@ void APIVulkan::create_depth_resources(const VkSwapchainInfo& swapchain)
 
     m_depth_image = img_factory.create(
         VulkanImageInfo{
-            .width = swapchain.extent.width,
-            .height = swapchain.extent.height,
+            .width = swapchain.m_extent.width,
+            .height = swapchain.m_extent.height,
             .mips = 1,
             .num_samples = m_msaa_samples,
             .format = DEPTH_FORMAT,
@@ -1222,23 +1058,23 @@ void APIVulkan::create_depth_resources(const VkSwapchainInfo& swapchain)
     m_depth_image->transition_layout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
 }
 
-auto APIVulkan::create_frame_buffers(VkSwapchainInfo swapchain, vk::RenderPass render_pass)
+auto APIVulkan::create_frame_buffers(const VulkanSwapchain& swapchain, vk::RenderPass render_pass)
     -> std::vector<vk::Framebuffer>
 {
-    std::vector<vk::Framebuffer> frame_buffers(swapchain.images.size());
+    std::vector<vk::Framebuffer> frame_buffers(swapchain.m_images.size());
 
     for (int i = 0; i < frame_buffers.size(); i++)
     {
         const std::array<vk::ImageView, 3> attachments{
-            m_color_image->view(), m_depth_image->view(), swapchain.image_views[i]
+            m_color_image->view(), m_depth_image->view(), swapchain.m_image_views[i]
         };
 
         auto create_info = vk::FramebufferCreateInfo(
             vk::FramebufferCreateFlags(),
             render_pass,
             attachments,
-            swapchain.extent.width,
-            swapchain.extent.height,
+            swapchain.m_extent.width,
+            swapchain.m_extent.height,
             1,
             nullptr
         );
@@ -1256,7 +1092,7 @@ void APIVulkan::record_example_command_buffer(vk::CommandBuffer& buffer, uint32_
         vk::RenderPassBeginInfo(
             m_example_renderpass,
             m_frame_buffers[image_index],
-            vk::Rect2D({0, 0}, m_swapchain_info.extent),
+            vk::Rect2D({0, 0}, m_swapchain_info->m_extent),
             CLEAR_VALUES
         ),
         vk::SubpassContents::eInline
@@ -1268,11 +1104,11 @@ void APIVulkan::record_example_command_buffer(vk::CommandBuffer& buffer, uint32_
     buffer.bindIndexBuffer(m_model_ib->buffer(), 0, vk::IndexType::eUint32);
 
     auto viewport = vk::Viewport(
-        0.0f, 0.0f, m_swapchain_info.extent.width, m_swapchain_info.extent.height, 0.0f, 1.0f
+        0.0f, 0.0f, m_swapchain_info->m_extent.width, m_swapchain_info->m_extent.height, 0.0f, 1.0f
     );
     buffer.setViewport(0, viewport);
 
-    auto scissor = vk::Rect2D({0, 0}, m_swapchain_info.extent);
+    auto scissor = vk::Rect2D({0, 0}, m_swapchain_info->m_extent);
     buffer.setScissor(0, scissor);
 
     buffer.bindDescriptorSets(
@@ -1319,29 +1155,7 @@ auto APIVulkan::create_descriptor_sets(uint32_t count) -> std::vector<vk::Descri
     );
 }
 
-void APIVulkan::cleanup_swapchain(VkSwapchainInfo& swapchain)
-{
-    m_color_image.reset();
-    m_depth_image.reset();
-
-    for (const auto& framebuffer : m_frame_buffers)
-    {
-        m_device->destroyFramebuffer(framebuffer);
-    }
-    for (const auto& image_view : m_swapchain_info.image_views)
-    {
-        m_device->destroyImageView(image_view);
-    }
-    m_device->destroySwapchainKHR(m_swapchain_info.swapchain);
-}
-
-auto APIVulkan::recreate_swapchain_and_framebuffers(
-    vk::PhysicalDevice physical_device,
-    vk::SurfaceKHR surface,
-    vk::Device device,
-    vk::SwapchainKHR old_swapchain,
-    vk::RenderPass render_pass
-) -> std::tuple<VkSwapchainInfo, std::vector<vk::Framebuffer>>
+auto APIVulkan::recreate_swapchain_and_framebuffers(vk::RenderPass render_pass) -> void
 {
     int width = 0, height = 0;
     glfwGetFramebufferSize(m_window_ref.get_raw_window(), &width, &height);
@@ -1351,11 +1165,17 @@ auto APIVulkan::recreate_swapchain_and_framebuffers(
         glfwWaitEvents();
     }
     m_device->waitIdle();
-    cleanup_swapchain(m_swapchain_info);
-    auto swapchain_info = create_swapchain(physical_device, surface, device, nullptr);
-    create_color_resources(swapchain_info);
-    create_depth_resources(swapchain_info);
-    auto frame_buffers = create_frame_buffers(swapchain_info, render_pass);
-    return {swapchain_info, frame_buffers};
+    m_color_image.reset();
+    m_depth_image.reset();
+    for (const auto& framebuffer : m_frame_buffers)
+    {
+        m_device->destroyFramebuffer(framebuffer);
+    }
+
+    m_swapchain_info->recreate();
+
+    create_color_resources(*m_swapchain_info);
+    create_depth_resources(*m_swapchain_info);
+    m_frame_buffers = create_frame_buffers(*m_swapchain_info, render_pass);
 }
 }  // namespace BE_NAMESPACE
