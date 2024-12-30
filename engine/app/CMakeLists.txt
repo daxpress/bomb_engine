@@ -8,7 +8,5 @@ target_sources(bomb_engine_app
    "scene.h" "entity.h"
 )
 
-find_package(EnTT CONFIG REQUIRED)
-
 target_link_libraries(bomb_engine_app 
-bomb_engine_graphics EnTT::EnTT bomb_engine_script)
+bomb_engine_graphics bomb_engine_script)
