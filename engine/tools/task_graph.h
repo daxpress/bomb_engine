@@ -38,10 +38,10 @@ struct TaskID
     auto operator>=(const TaskID& other) const;
     auto operator<=>(const TaskID& other) const;
 
-    auto before(const TaskID& id) const -> void;
-    auto before(const std::vector<TaskID>& id) const -> void;
-    auto after(const TaskID& id) const -> void;
-    auto after(const std::vector<TaskID>& id) const -> void;
+    [[maybe_unused]] auto before(const TaskID& id) const -> const TaskID&;
+    [[maybe_unused]] auto before(const std::vector<TaskID>& id) const -> const TaskID&;
+    [[maybe_unused]] auto after(const TaskID& id) const -> const TaskID&;
+    [[maybe_unused]] auto after(const std::vector<TaskID>& id) const -> const TaskID&;
 
     TaskID(const TaskID& id) = default;
 

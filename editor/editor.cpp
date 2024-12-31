@@ -110,14 +110,10 @@ auto main() -> int
         }
     );
 
-    task1.before({task2, task3});
-    task4.after({task2, task1});
-
     const auto task6 = tasks.add_task(coroutine());
     const auto task7 = tasks.add_task(coroutine2());
     const auto task8 = tasks.add_task(coroutine3());
     const auto task9 = tasks.add_task(super_slow_async_work());
-    task6.after({task7, task8});
 
     tasks.execute(bomb_engine::ExecutionPolicy::MultiThreaded);
 

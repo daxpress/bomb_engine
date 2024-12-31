@@ -38,6 +38,7 @@ auto TaskGraph::TaskVisitor::operator()(const Coroutine& coro) const -> bool
                 std::lock_guard lock(m_graph.m_mutex);
                 m_graph.m_task_queue.push(m_id);
             }
+            m_graph.m_cv.notify_all();
             return false;
         }
         // future is not ready, put the coroutine back in the queue
@@ -87,10 +88,26 @@ auto TaskID::operator>(const TaskID& other) const { return m_ID > other.m_ID; }
 auto TaskID::operator>=(const TaskID& other) const { return m_ID >= other.m_ID; }
 auto TaskID::operator<=>(const TaskID& other) const { return m_ID <=> other.m_ID; }
 
-auto TaskID::before(const TaskID& id) const -> void { m_graph.run_before(*this, id); }
-auto TaskID::before(const std::vector<TaskID>& id) const -> void { m_graph.run_before(*this, id); }
-auto TaskID::after(const TaskID& id) const -> void { m_graph.run_after(*this, id); }
-auto TaskID::after(const std::vector<TaskID>& id) const -> void { m_graph.run_after(*this, id); }
+auto TaskID::before(const TaskID& id) const -> const TaskID&
+{
+    m_graph.run_before(*this, id);
+    return *this;
+}
+auto TaskID::before(const std::vector<TaskID>& id) const -> const TaskID&
+{
+    m_graph.run_before(*this, id);
+    return *this;
+}
+auto TaskID::after(const TaskID& id) const -> const TaskID&
+{
+    m_graph.run_after(*this, id);
+    return *this;
+}
+auto TaskID::after(const std::vector<TaskID>& id) const -> const TaskID&
+{
+    m_graph.run_after(*this, id);
+    return *this;
+}
 
 #pragma endregion
 
