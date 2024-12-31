@@ -17,10 +17,35 @@ TaskGraph::TaskVisitor::TaskVisitor(TaskGraph& graph, const task_id_t id) : m_gr
 
 auto TaskGraph::TaskVisitor::operator()(const Coroutine& coro) const -> bool
 {
+    // valid coroutine?
     if (!coro.handle || coro.handle.done())
     {
         return false;
     }
+
+    // has a future to wait on or is it suspend_always{}?
+    const auto& promise = coro.handle.promise();
+    if (promise.future.has_value() && promise.future->valid())
+    {
+        // manage future status
+        if (const auto status = promise.future->wait_for(std::chrono::milliseconds(0));
+            status == std::future_status::ready)
+        {
+            // future is ready!
+            coro.handle.resume();
+            if (!coro.handle.done())
+            {
+                std::lock_guard lock(m_graph.m_mutex);
+                m_graph.m_task_queue.push(m_id);
+            }
+            return false;
+        }
+        // future is not ready, put the coroutine back in the queue
+        std::lock_guard lock(m_graph.m_mutex);
+        m_graph.m_task_queue.push(m_id);
+        return true;
+    }
+    // no future used so if the coroutine is not done then simply re-queue it
     coro.handle.resume();
     if (coro.handle && !coro.handle.done())
     {
@@ -94,14 +119,12 @@ void TaskGraph::CoroutineWorkerAwaiter::await_suspend(const std::coroutine_handl
 auto TaskGraph::add_task(Coroutine&& task) -> TaskID
 {
     const auto taskID = m_current_taskID++;
-    Log(TaskGraphCategory, LogSeverity::Display, "Adding task {}", taskID);
     m_tasks[taskID] = Task(std::move(task));
     return {taskID, *this};
 }
 auto TaskGraph::add_task(std::function<void()>&& task) -> TaskID
 {
     const auto taskID = m_current_taskID++;
-    Log(TaskGraphCategory, LogSeverity::Display, "Adding task {}", taskID);
     m_tasks[taskID] = Task(std::move(task));
     return {taskID, *this};
 }
@@ -136,45 +159,30 @@ auto TaskGraph::run_after(const TaskID& after, const std::span<const TaskID> bef
         before.crbegin(), before.crend(), [&](const TaskID& taskID) { run_after(after, taskID); }
     );
 }
-auto TaskGraph::execute_with_coroutine() -> void
+auto TaskGraph::execute_single_thread() -> void
 {
-    std::vector<Coroutine> coroutines;
-
+    for (const auto& id : std::views::keys(m_tasks))
     {
-        const std::lock_guard lock(m_mutex);
-        for (const auto& id : std::views::keys(m_tasks))
+        if (m_indegree_list[id] == 0)
         {
-            if (m_indegree_list[id] == 0)
+            m_task_queue.push(id);
+        }
+    }
+    while (!m_task_queue.empty())
+    {
+        auto current_id = m_task_queue.front();
+        m_task_queue.pop();
+
+        auto& current_task = m_tasks[current_id];
+        std::visit(TaskVisitor{*this, current_id}, current_task);
+        for (const auto& dependent : m_adjacency_list[current_id])
+        {
+            if (--m_indegree_list[dependent] == 0)
             {
-                m_task_queue.push(id);
+                m_task_queue.push(dependent);
             }
         }
     }
-
-    const auto thread_count = std::thread::hardware_concurrency();
-    for (auto i = 0; i < thread_count; ++i)
-    {
-        coroutines.emplace_back(coroutine_worker());
-    }
-
-    {
-        const std::lock_guard lock(m_mutex);
-        m_stop = true;  // Set stop flag to true once all tasks are enqueued so that they will stop
-        // once m_task_queue is empty
-    }
-
-    // Notify all workers that they can stop when no tasks left
-    m_cv.notify_all();
-
-    for (auto& coroutine : coroutines)
-    {
-        if (coroutine.handle && !coroutine.handle.done())
-        {
-            coroutine.handle.resume();
-        }
-    }
-
-    coroutines.clear();
 }
 
 auto TaskGraph::execute_with_threads() -> void
@@ -217,8 +225,8 @@ auto TaskGraph::execute(const ExecutionPolicy policy) -> void
 {
     switch (policy)
     {
-        case ExecutionPolicy::Coroutine:
-            execute_with_coroutine();
+        case ExecutionPolicy::SingleThreaded:
+            execute_single_thread();
             return;
         case ExecutionPolicy::MultiThreaded:
             execute_with_threads();
@@ -226,55 +234,6 @@ auto TaskGraph::execute(const ExecutionPolicy policy) -> void
     }
 }
 
-auto TaskGraph::coroutine_worker() -> Coroutine
-{
-    while (true)
-    {
-        {
-            co_await CoroutineWorkerAwaiter{
-                m_cv, m_mutex, [&]() { return !m_task_queue.empty() || m_stop; }
-            };
-        }
-
-        task_id_t current_id;
-        {
-            const std::lock_guard lock(m_mutex);
-            if (m_stop && m_task_queue.empty())
-            {
-                co_return;
-            }
-            current_id = m_task_queue.front();
-            m_task_queue.pop();
-        }  // unlock
-
-        Log(TaskGraphCategory, LogSeverity::Display, "Processing worker for task {}...", current_id
-        );
-        // retrieve task and run it
-        if (m_tasks.contains(current_id))
-        {
-            auto& current_task = m_tasks[current_id];
-            Log(TaskGraphCategory, LogSeverity::Display, "launching task with id: {}", current_id);
-            const auto paused = std::visit(TaskVisitor{*this, current_id}, current_task);
-            if (paused)
-            {
-                Log(TaskGraphCategory, LogSeverity::Display, "Task {} Paused", current_id);
-                continue;
-            }
-        }
-
-        {
-            const std::lock_guard lock(m_mutex);
-            for (const auto& dependent : m_adjacency_list[current_id])
-            {
-                if (--m_indegree_list[dependent] == 0)
-                {
-                    m_task_queue.push(dependent);
-                }
-            }
-            m_cv.notify_all();
-        }
-    }
-}
 auto TaskGraph::threads_worker() -> void
 {
     while (true)
@@ -292,19 +251,11 @@ auto TaskGraph::threads_worker() -> void
             m_task_queue.pop();
         }
 
-        Log(TaskGraphCategory, LogSeverity::Display, "Processing worker for task {}...", current_id
-        );
         // retrieve task and run it
         if (m_tasks.contains(current_id))
         {
             auto& current_task = m_tasks[current_id];
-            Log(TaskGraphCategory, LogSeverity::Display, "launching task with id: {}", current_id);
-            const auto paused = std::visit(TaskVisitor{*this, current_id}, current_task);
-            if (paused)
-            {
-                Log(TaskGraphCategory, LogSeverity::Display, "Task {} Paused", current_id);
-                continue;
-            }
+            std::visit(TaskVisitor{*this, current_id}, current_task);
         }
 
         {

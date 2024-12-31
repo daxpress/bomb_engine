@@ -1,13 +1,13 @@
 #pragma once
 
 #include <functional>
+#include <queue>
 #include <span>
 #include <unordered_set>
 #include <variant>
 
 #include "../macros.h"
 #include "coroutine.h"
-#include "thread_safe_queue.h"
 
 namespace BE_NAMESPACE
 {
@@ -18,7 +18,7 @@ using Task = std::variant<Coroutine, std::function<void()>>;
 enum class ExecutionPolicy : uint8_t
 {
     MultiThreaded,
-    Coroutine,
+    SingleThreaded,
 };
 
 struct TaskID
@@ -73,10 +73,9 @@ private:
     inline auto run_after(const TaskID& after, const TaskID& before) -> void;
     inline auto run_after(const TaskID& after, const std::span<const TaskID> before) -> void;
 
-    inline auto execute_with_coroutine() -> void;
+    inline auto execute_single_thread() -> void;
     inline auto execute_with_threads() -> void;
 
-    auto coroutine_worker() -> Coroutine;
     auto threads_worker() -> void;
 
     task_id_t m_current_taskID = 0;
@@ -116,6 +115,5 @@ private:
         std::function<bool()> m_predicate;
         std::coroutine_handle<> m_handle;
     };
-
 };
 }  // namespace BE_NAMESPACE
