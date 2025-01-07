@@ -4,6 +4,7 @@
 #include <ranges>
 
 #include "log.h"
+#include "stopwatch.h"
 
 MakeCategory(TaskGraph);
 
@@ -35,14 +36,14 @@ auto TaskGraph::TaskVisitor::operator()(const Coroutine& coro) const -> bool
             coro.handle.resume();
             if (!coro.handle.done())
             {
-                std::lock_guard lock(m_graph.m_mutex);
+                const std::lock_guard lock(m_graph.m_mutex);
                 m_graph.m_task_queue.push(m_id);
             }
-            m_graph.m_cv.notify_all();
+            m_graph.m_cv.notify_one();
             return false;
         }
         // future is not ready, put the coroutine back in the queue
-        std::lock_guard lock(m_graph.m_mutex);
+        const std::lock_guard lock(m_graph.m_mutex);
         m_graph.m_task_queue.push(m_id);
         return true;
     }
@@ -56,7 +57,7 @@ auto TaskGraph::TaskVisitor::operator()(const Coroutine& coro) const -> bool
         }
         return true;
     }
-    m_graph.m_cv.notify_all();
+    m_graph.m_cv.notify_one();
     return false;
 }
 
@@ -109,26 +110,6 @@ auto TaskID::after(const std::vector<TaskID>& id) const -> const TaskID&
     return *this;
 }
 
-#pragma endregion
-
-#pragma region Worker Awaiter
-TaskGraph::CoroutineWorkerAwaiter::CoroutineWorkerAwaiter(
-    std::condition_variable& cv, std::mutex& mutex, std::function<bool()> predicate
-)
-    : m_cv(cv), m_mutex(mutex), m_predicate(std::move(predicate))
-{
-}
-auto TaskGraph::CoroutineWorkerAwaiter::await_ready() const noexcept -> bool
-{
-    const std::unique_lock lock(m_mutex);
-    return m_predicate();
-}
-void TaskGraph::CoroutineWorkerAwaiter::await_suspend(const std::coroutine_handle<> coro)
-{
-    std::unique_lock lock(m_mutex);
-    m_handle = coro;
-    m_cv.wait(lock, [&] { return m_predicate(); });
-}
 #pragma endregion
 
 #pragma region TaskGraph
@@ -192,13 +173,7 @@ auto TaskGraph::execute_single_thread() -> void
 
         auto& current_task = m_tasks[current_id];
         std::visit(TaskVisitor{*this, current_id}, current_task);
-        for (const auto& dependent : m_adjacency_list[current_id])
-        {
-            if (--m_indegree_list[dependent] == 0)
-            {
-                m_task_queue.push(dependent);
-            }
-        }
+        add_available_tasks(current_id);
     }
 }
 
@@ -217,8 +192,7 @@ auto TaskGraph::execute_with_threads() -> void
         }
     }
 
-    const auto thread_count = std::thread::hardware_concurrency();
-    for (auto i = 0; i < thread_count; ++i)
+    for (auto i = 0; i < m_thread_count; ++i)
     {
         threads.emplace_back(&TaskGraph::threads_worker, this);
     }
@@ -240,15 +214,17 @@ auto TaskGraph::execute_with_threads() -> void
 
 auto TaskGraph::execute(const ExecutionPolicy policy) -> void
 {
+    const auto stopwatch = Stopwatch();
     switch (policy)
     {
         case ExecutionPolicy::SingleThreaded:
             execute_single_thread();
-            return;
+            break;
         case ExecutionPolicy::MultiThreaded:
             execute_with_threads();
-            return;
+            break;
     }
+    Log(TaskGraphCategory, LogSeverity::Display, "Execution time: {} seconds", stopwatch.elapsed());
 }
 
 auto TaskGraph::threads_worker() -> void
@@ -277,14 +253,26 @@ auto TaskGraph::threads_worker() -> void
 
         {
             const std::lock_guard lock(m_mutex);
-            for (const auto& dependent : m_adjacency_list[current_id])
-            {
-                if (--m_indegree_list[dependent] == 0)
-                {
-                    m_task_queue.push(dependent);
-                }
-            }
+            add_available_tasks(current_id);
             m_cv.notify_all();
+        }
+    }
+}
+auto TaskGraph::add_available_tasks(const task_id_t task_id) -> void
+{
+    if (const auto& coro = m_tasks[task_id]; std::holds_alternative<Coroutine>(coro))
+    {
+        // if the coroutine is not done the adjacency list should not be touched!
+        if (!std::get<Coroutine>(coro).handle.done())
+        {
+            return;
+        }
+    }
+    for (const auto& dependent : m_adjacency_list[task_id])
+    {
+        if (--m_indegree_list[dependent] == 0)
+        {
+            m_task_queue.push(dependent);
         }
     }
 }

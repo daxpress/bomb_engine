@@ -11,10 +11,10 @@ setup_static_analysis(bomb_engine_tools)
 target_sources(bomb_engine_tools
         PUBLIC
         FILE_SET HEADERS FILES
-        "log.h" "dispatcher.h" "task_graph.h" "coroutine.h"
+        "log.h" "dispatcher.h" "task_graph.h" "coroutine.h" "stopwatch.h"
         PRIVATE
         "../macros.h"
-        "log.cpp" "dispatcher.cpp" "task_graph.cpp" "coroutine.cpp"
+        "log.cpp" "dispatcher.cpp" "task_graph.cpp" "coroutine.cpp" "stopwatch.cpp"
 )
 
 target_include_directories(bomb_engine_tools

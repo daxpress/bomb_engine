@@ -64,6 +64,7 @@ public:
     [[nodiscard]] auto add_task(std::function<void()>&& task) -> TaskID;
     auto execute(const ExecutionPolicy policy = ExecutionPolicy::MultiThreaded) -> void;
     void stop() { m_stop = true; }
+    void set_thread_count(const uint8_t thread_count) { m_thread_count = thread_count; }
 
     ~TaskGraph();
 
@@ -77,8 +78,10 @@ private:
     inline auto execute_with_threads() -> void;
 
     auto threads_worker() -> void;
+    inline void add_available_tasks(const task_id_t task_id);
 
     task_id_t m_current_taskID = 0;
+    uint8_t m_thread_count = std::thread::hardware_concurrency();
     std::unordered_map<task_id_t, Task> m_tasks;
     std::unordered_map<task_id_t, std::unordered_set<task_id_t>> m_adjacency_list;
     std::unordered_map<task_id_t, uint32_t> m_indegree_list;
@@ -97,23 +100,6 @@ private:
     private:
         TaskGraph& m_graph;
         task_id_t m_id;
-    };
-
-    struct CoroutineWorkerAwaiter
-    {
-        CoroutineWorkerAwaiter(
-            std::condition_variable& cv, std::mutex& mutex, std::function<bool()> predicate
-        );
-
-        auto await_ready() const noexcept -> bool;
-        void await_suspend(std::coroutine_handle<> coro);
-        void await_resume() const noexcept {}
-
-    private:
-        std::condition_variable& m_cv;
-        std::mutex& m_mutex;
-        std::function<bool()> m_predicate;
-        std::coroutine_handle<> m_handle;
     };
 };
 }  // namespace BE_NAMESPACE

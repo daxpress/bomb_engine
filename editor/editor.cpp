@@ -114,13 +114,13 @@ auto main() -> int
     const auto task7 = tasks.add_task(coroutine2());
     const auto task8 = tasks.add_task(coroutine3());
     const auto task9 = tasks.add_task(super_slow_async_work());
+    task6.before(task1);
 
     tasks.execute(bomb_engine::ExecutionPolicy::MultiThreaded);
 
     // we will need ways to configure the app to be used as an editor...
     // right now it's just fine to use sample code to get major functionality going.
     // (no point in building an editor for an engine that doesn't exist yet)
-    Log(EditorCategory, LogSeverity::Display, "This is Display");
 
     app.loop();
 

@@ -16,10 +16,7 @@ struct Coroutine
     // define the promise_type for the coroutine
     struct promise_type
     {
-        auto get_return_object() -> Coroutine
-        {
-            return Coroutine{std::coroutine_handle<promise_type>::from_promise(*this)};
-        }
+        auto get_return_object() -> Coroutine;
         // still debating if using never or always
         auto initial_suspend() noexcept -> std::suspend_always { return {}; }
         [[nodiscard]] auto final_suspend() const noexcept -> std::suspend_always { return {}; }
@@ -35,22 +32,9 @@ struct Coroutine
     explicit Coroutine(std::coroutine_handle<promise_type> from_promise) : handle(from_promise) {};
 
     Coroutine() = default;
-    ~Coroutine()
-    {
-        if (handle)
-        {
-            handle.destroy();
-        }
-    }
+    ~Coroutine();
     Coroutine(Coroutine&& other) noexcept : handle(std::exchange(other.handle, nullptr)) {}
-    auto operator=(Coroutine&& other) noexcept -> Coroutine&
-    {
-        if (this != &other)
-        {
-            handle = std::exchange(other.handle, nullptr);
-        }
-        return *this;
-    }
+    auto operator=(Coroutine&& other) noexcept -> Coroutine&;
 
     std::coroutine_handle<promise_type> handle;
 };
@@ -64,26 +48,8 @@ struct coroutine_awaitable
     {
     }
 
-    bool await_ready() const noexcept
-    {
-        // query status
-        return future &&
-               future.value().wait_for(std::chrono::milliseconds(0)) == std::future_status::ready;
-    }
-    void await_suspend(std::coroutine_handle<Coroutine::promise_type> h) const noexcept
-    {
-        auto& promise = h.promise();
-        if (future)
-        {
-            promise.set_future(std::move(future.value()));
-        }
-        std::thread(
-            [this, h]()
-            {
-                future->wait();  // Wait for the future to complete
-            }
-        ).detach();
-    }
+    bool await_ready() const noexcept;
+    void await_suspend(std::coroutine_handle<Coroutine::promise_type> h) const noexcept;
 
     void await_resume() const noexcept {}
 };
