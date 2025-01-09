@@ -39,9 +39,13 @@ struct TaskID
     auto operator<=>(const TaskID& other) const;
 
     [[maybe_unused]] auto before(const TaskID& id) const -> const TaskID&;
-    [[maybe_unused]] auto before(const std::vector<TaskID>& id) const -> const TaskID&;
+    [[maybe_unused]] auto before(const std::initializer_list<const TaskID>& id) const
+        -> const TaskID&;
+    [[maybe_unused]] auto before(const std::span<const TaskID>& id) const -> const TaskID&;
     [[maybe_unused]] auto after(const TaskID& id) const -> const TaskID&;
-    [[maybe_unused]] auto after(const std::vector<TaskID>& id) const -> const TaskID&;
+    [[maybe_unused]] auto after(const std::initializer_list<const TaskID>& id) const
+        -> const TaskID&;
+    [[maybe_unused]] auto after(const std::span<const TaskID>& id) const -> const TaskID&;
 
     TaskID(const TaskID& id) = default;
 
@@ -64,21 +68,25 @@ public:
     [[nodiscard]] auto add_task(std::function<void()>&& task) -> TaskID;
     auto execute(const ExecutionPolicy policy = ExecutionPolicy::MultiThreaded) -> void;
     void stop() { m_stop = true; }
-    void set_thread_count(const uint8_t thread_count) { m_thread_count = thread_count; }
+    void set_thread_count(const uint8_t thread_count)
+    {
+        m_thread_count = std::clamp<uint8_t>(thread_count, 2, std::thread::hardware_concurrency());
+    }
 
     ~TaskGraph();
 
 private:
+    // first one is also used for run_after
     inline auto run_before(const TaskID& before, const TaskID& after) -> void;
-    inline auto run_before(const TaskID& before, const std::span<const TaskID> after) -> void;
-    inline auto run_after(const TaskID& after, const TaskID& before) -> void;
-    inline auto run_after(const TaskID& after, const std::span<const TaskID> before) -> void;
+    inline auto run_before(const TaskID& before, const std::span<const TaskID>& after) -> void;
+    inline auto run_after(const TaskID& after, const std::span<const TaskID>& before) -> void;
 
     inline auto execute_single_thread() -> void;
     inline auto execute_with_threads() -> void;
 
     auto threads_worker() -> void;
     inline void add_available_tasks(const task_id_t task_id);
+    inline void increment_task_counter();
 
     task_id_t m_current_taskID = 0;
     uint8_t m_thread_count = std::thread::hardware_concurrency();
@@ -88,6 +96,8 @@ private:
 
     std::queue<task_id_t> m_task_queue;
     std::atomic_bool m_stop{false};
+    bool m_running{false};
+    std::atomic_uint32_t m_tasks_ended{0};
     std::mutex m_mutex;
     std::condition_variable m_cv;
 

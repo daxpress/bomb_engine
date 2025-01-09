@@ -48,8 +48,12 @@ public:
 
 // Defines a new category for the logger.
 // Takes an optional LogSeverity parameter to define the minimum supported severity.
+#ifdef _DEBUG
 #define MakeCategory(Name, ...) \
     inline static LogCategory Name##Category = LogCategory(#Name, __VA_ARGS__)
+#else
+#define MakeCategory(Name, ...)
+#endif
 
 #pragma endregion
 
@@ -121,6 +125,8 @@ private:
 };
 
 #pragma endregion
+
+#ifdef _DEBUG
 
 // refer to https://fmt.dev/latest/syntax/#chrono-format-specifications for the formatting
 // specifications
@@ -213,3 +219,8 @@ Log(const LogCategory& category, LogSeverity severity, const std::string& messag
 
 // define a few categories for everyone to use
 MakeCategory(LogTemp);
+
+#else
+
+#define Log(...)
+#endif

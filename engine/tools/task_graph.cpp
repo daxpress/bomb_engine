@@ -25,8 +25,8 @@ auto TaskGraph::TaskVisitor::operator()(const Coroutine& coro) const -> bool
     }
 
     // has a future to wait on or is it suspend_always{}?
-    const auto& promise = coro.handle.promise();
-    if (promise.future.has_value() && promise.future->valid())
+    if (const auto& promise = coro.handle.promise();
+        promise.future.has_value() && promise.future->valid())
     {
         // manage future status
         if (const auto status = promise.future->wait_for(std::chrono::milliseconds(0));
@@ -38,6 +38,10 @@ auto TaskGraph::TaskVisitor::operator()(const Coroutine& coro) const -> bool
             {
                 const std::lock_guard lock(m_graph.m_mutex);
                 m_graph.m_task_queue.push(m_id);
+            }
+            else
+            {
+                m_graph.increment_task_counter();
             }
             m_graph.m_cv.notify_one();
             return false;
@@ -57,6 +61,9 @@ auto TaskGraph::TaskVisitor::operator()(const Coroutine& coro) const -> bool
         }
         return true;
     }
+
+    m_graph.increment_task_counter();
+
     m_graph.m_cv.notify_one();
     return false;
 }
@@ -64,6 +71,8 @@ auto TaskGraph::TaskVisitor::operator()(const Coroutine& coro) const -> bool
 auto TaskGraph::TaskVisitor::operator()(const std::function<void()>& func) const -> bool
 {
     func();
+    // increment ended tasks counter
+    m_graph.increment_task_counter();
     return false;
 }
 
@@ -94,17 +103,27 @@ auto TaskID::before(const TaskID& id) const -> const TaskID&
     m_graph.run_before(*this, id);
     return *this;
 }
-auto TaskID::before(const std::vector<TaskID>& id) const -> const TaskID&
+auto TaskID::before(const std::initializer_list<const TaskID>& id) const -> const TaskID&
+{
+    m_graph.run_before(*this, id);
+    return *this;
+}
+auto TaskID::before(const std::span<const TaskID>& id) const -> const TaskID&
 {
     m_graph.run_before(*this, id);
     return *this;
 }
 auto TaskID::after(const TaskID& id) const -> const TaskID&
 {
+    m_graph.run_before(id, *this);
+    return *this;
+}
+auto TaskID::after(const std::initializer_list<const TaskID>& id) const -> const TaskID&
+{
     m_graph.run_after(*this, id);
     return *this;
 }
-auto TaskID::after(const std::vector<TaskID>& id) const -> const TaskID&
+auto TaskID::after(const std::span<const TaskID>& id) const -> const TaskID&
 {
     m_graph.run_after(*this, id);
     return *this;
@@ -129,32 +148,23 @@ auto TaskGraph::add_task(std::function<void()>&& task) -> TaskID
 
 auto TaskGraph::run_before(const TaskID& before, const TaskID& after) -> void
 {
-    if (before == after)
+    if (before == after || m_adjacency_list[before.m_ID].contains(after.m_ID))
     {
         return;
     }
     m_adjacency_list[before.m_ID].insert(after.m_ID);
     m_indegree_list[after.m_ID]++;
 }
-auto TaskGraph::run_before(const TaskID& before, const std::span<const TaskID> after) -> void
+auto TaskGraph::run_before(const TaskID& before, const std::span<const TaskID>& after) -> void
 {
     std::ranges::for_each(
         after.crbegin(), after.crend(), [&](const TaskID& taskID) { run_before(before, taskID); }
     );
 }
-auto TaskGraph::run_after(const TaskID& after, const TaskID& before) -> void
-{
-    if (before == after)
-    {
-        return;
-    }
-    m_adjacency_list[before.m_ID].insert(after.m_ID);
-    m_indegree_list[after.m_ID]++;
-}
-auto TaskGraph::run_after(const TaskID& after, const std::span<const TaskID> before) -> void
+auto TaskGraph::run_after(const TaskID& after, const std::span<const TaskID>& before) -> void
 {
     std::ranges::for_each(
-        before.crbegin(), before.crend(), [&](const TaskID& taskID) { run_after(after, taskID); }
+        before.crbegin(), before.crend(), [&](const TaskID& taskID) { run_before(taskID, after); }
     );
 }
 auto TaskGraph::execute_single_thread() -> void
@@ -197,15 +207,6 @@ auto TaskGraph::execute_with_threads() -> void
         threads.emplace_back(&TaskGraph::threads_worker, this);
     }
 
-    {
-        const std::lock_guard lock(m_mutex);
-        m_stop = true;  // Set stop flag to true once all tasks are enqueued so that they will stop
-        // once m_task_queue is empty
-    }
-
-    // Notify all workers that they can stop when no tasks left
-    m_cv.notify_all();
-
     for (auto& thread : threads)
     {
         thread.join();
@@ -214,6 +215,14 @@ auto TaskGraph::execute_with_threads() -> void
 
 auto TaskGraph::execute(const ExecutionPolicy policy) -> void
 {
+    if (m_running)
+    {
+        Log(TaskGraphCategory, LogSeverity::Error, "TaskGraph already running!");
+        return;
+    }
+    m_running = true;
+    m_tasks_ended = 0;
+    m_stop = false;
     const auto stopwatch = Stopwatch();
     switch (policy)
     {
@@ -225,6 +234,7 @@ auto TaskGraph::execute(const ExecutionPolicy policy) -> void
             break;
     }
     Log(TaskGraphCategory, LogSeverity::Display, "Execution time: {} seconds", stopwatch.elapsed());
+    m_running = false;
 }
 
 auto TaskGraph::threads_worker() -> void
@@ -234,9 +244,9 @@ auto TaskGraph::threads_worker() -> void
         task_id_t current_id;
         {
             std::unique_lock lock(m_mutex);
-            m_cv.wait(lock, [&]() { return !m_task_queue.empty() || m_stop; });
+            m_cv.wait(lock, [&] { return !m_task_queue.empty() || m_stop; });
 
-            if (m_stop && m_task_queue.empty())
+            if (m_stop)
             {
                 break;
             }
@@ -274,6 +284,16 @@ auto TaskGraph::add_available_tasks(const task_id_t task_id) -> void
         {
             m_task_queue.push(dependent);
         }
+    }
+}
+
+void TaskGraph::increment_task_counter()
+{
+    ++m_tasks_ended;
+    if (m_tasks_ended == m_tasks.size())
+    {
+        m_stop = true;
+        m_cv.notify_all();
     }
 }
 

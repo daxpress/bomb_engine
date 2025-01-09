@@ -1,5 +1,7 @@
 #include "log.h"
 
+#ifdef _DEBUG
+
 #include <fstream>
 #include <mutex>
 #include <syncstream>
@@ -57,12 +59,18 @@ void DefaultFileDevice::print_message(
     const std::string& message
 )
 {
-    if (severity < LogSeverity::Log) return;
+    if (severity < LogSeverity::Log)
+    {
+        return;
+    }
     // make dir if not present
     std::filesystem::create_directory(log_dir);
     // open fstream
     auto log_file = std::ofstream(log_path, std::ios::app);
-    if (!log_file.is_open()) return;
+    if (!log_file.is_open())
+    {
+        return;
+    }
 
     // // wrap with osyncstream to ensure it is thread safe
     auto sync_stream = std::osyncstream(log_file);
@@ -75,3 +83,4 @@ void DefaultFileDevice::print_message(
         sync_stream, fmt::runtime("[{}] - {} [{}]{}{}"), time, category, log_type, location, message
     );
 }
+#endif
