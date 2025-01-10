@@ -1,7 +1,8 @@
 #pragma once
 
-#include <type_traits>
 #include <functional>
+#include <mutex>
+#include <type_traits>
 
 namespace BE_NAMESPACE
 {
@@ -27,8 +28,8 @@ private:
     // uuid generation overloads for the function
 
     template <typename Callable>
-        requires (!std::is_member_function_pointer_v<Callable>)
-                  static auto generate_key(Callable callable)->size_t
+        requires(!std::is_member_function_pointer_v<Callable>)
+    static auto generate_key(Callable callable) -> size_t
     {
         // it doesn't make sense to put the same free function twice in a dispatcher so this is fine
         // to me
@@ -38,14 +39,15 @@ private:
     // common method for placing the listener in the map
     inline void place_listener(const size_t key, internal_fn&& fn)
     {
+        std::lock_guard lock(mutex);
         listeners.emplace(key, std::move(fn));
     }
 
 public:
     // add_listener overloads for functions and methods and restrict compilation using requirements
     template <typename Callable>
-        requires (!std::is_member_function_pointer_v<Callable>)
-                 inline void add_listener(Callable && listener)
+        requires(!std::is_member_function_pointer_v<Callable>)
+    inline void add_listener(Callable&& listener)
     {
         place_listener(generate_key(listener), std::forward<Callable>(listener));
     }
@@ -67,13 +69,15 @@ public:
         requires std::is_member_function_pointer_v<Callable>
     inline void remove_listener(Callable callable, Context* context)
     {
+        std::lock_guard lock(mutex);
         listeners.erase(generate_key<Callable, Context>(callable, context));
     }
 
     template <typename Callable>
-        requires (!std::is_member_function_pointer_v<Callable>)
-                 inline void remove_listener(Callable callable)
+        requires(!std::is_member_function_pointer_v<Callable>)
+    inline void remove_listener(Callable callable)
     {
+        std::lock_guard lock(mutex);
         listeners.erase(generate_key(callable));
     }
 
@@ -85,6 +89,7 @@ public:
 
     inline void broadcast(Args&&... args)
     {
+        std::lock_guard lock(mutex);
         for (const auto& [key, listener] : listeners)
         {
             listener(args...);
@@ -93,5 +98,6 @@ public:
 
 private:
     listeners_map_t listeners{};
+    std::mutex mutex{};
 };
 }  // namespace BE_NAMESPACE

@@ -17,6 +17,7 @@
 #include <cinttypes>
 #include <cmath>
 #include <cstdint>
+#include <entt/entt.hpp>
 #include <expected>
 #include <filesystem>
 #include <fstream>
@@ -29,5 +30,3 @@
 
 #include "macros.h"
 #include "tools/tools.h"
-
-#include <entt/entt.hpp>
