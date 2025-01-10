@@ -84,7 +84,7 @@ private:
     inline auto execute_single_thread() -> void;
     inline auto execute_with_threads() -> void;
 
-    auto threads_worker() -> void;
+    auto thread_worker() -> void;
     inline void add_available_tasks(const task_id_t task_id);
     inline void increment_task_counter();
 

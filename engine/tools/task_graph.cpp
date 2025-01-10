@@ -204,7 +204,7 @@ auto TaskGraph::execute_with_threads() -> void
 
     for (auto i = 0; i < m_thread_count; ++i)
     {
-        threads.emplace_back(&TaskGraph::threads_worker, this);
+        threads.emplace_back(&TaskGraph::thread_worker, this);
     }
 
     for (auto& thread : threads)
@@ -237,7 +237,7 @@ auto TaskGraph::execute(const ExecutionPolicy policy) -> void
     m_running = false;
 }
 
-auto TaskGraph::threads_worker() -> void
+auto TaskGraph::thread_worker() -> void
 {
     while (true)
     {
